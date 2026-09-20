@@ -1,16 +1,14 @@
 package com.example.gamerhub
 
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
-import android.widget.TextView
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,27 +18,19 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(
-                systemBars.left,
-                systemBars.top,
-                systemBars.right,
-                systemBars.bottom
-            )
-            insets
-        }
-        val logoText = findViewById<TextView>(R.id.logoText)
+        // Находим контейнер для страниц
+        val pageContainer = findViewById<FrameLayout>(
+            R.id.pageContainer
+        )
 
-        val logo = SpannableString("GamerHub")
-        logo.setSpan(
-            ForegroundColorSpan(android.graphics.Color.rgb(145,90,225)),
-            5,
-            8,
-            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        logoText.text = logo
+        // Загружаем главную страницу
+        val homeView = LayoutInflater.from(this)
+            .inflate(R.layout.screen_home, pageContainer, false)
 
+        // Добавляем главную страницу в контейнер
+        pageContainer.addView(homeView)
 
+        // Список игр
         val games = listOf(
 
             Game(
@@ -86,7 +76,8 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        val recyclerView = findViewById<RecyclerView>(
+        // Ищем RecyclerView уже внутри Home
+        val recyclerView = homeView.findViewById<RecyclerView>(
             R.id.gamesRecyclerView
         )
 
@@ -96,5 +87,24 @@ class MainActivity : AppCompatActivity() {
         )
 
         recyclerView.adapter = GameAdapter(games)
+
+        // Системные отступы
+        ViewCompat.setOnApplyWindowInsetsListener(
+            findViewById(R.id.main)
+        ) { v, insets ->
+
+            val systemBars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars()
+            )
+
+            v.setPadding(
+                systemBars.left,
+                systemBars.top,
+                systemBars.right,
+                systemBars.bottom
+            )
+
+            insets
+        }
     }
 }
