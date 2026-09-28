@@ -1,13 +1,211 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#121216">
 
-    <FrameLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        android:clipToPadding="false"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-    </FrameLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="30dp">
+
+            <!-- Заголовок -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Создать публикацию"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Поделись своим игровым опытом"
+                android:textColor="#888892"
+                android:textSize="14sp" />
+
+            <!-- Добавление изображения -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="Обложка публикации"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <FrameLayout
+                android:id="@+id/imageUploadArea"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_search"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="＋"
+                        android:textColor="#9B7AFF"
+                        android:textSize="54sp"
+                        android:gravity="center" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Добавить изображение"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Скриншот или обложка игры"
+                        android:textColor="#888892"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
+
+            <!-- Название -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="26dp"
+                android:text="Название"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/postTitle"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_search"
+                android:hint="Например, мой первый рейд..."
+                android:textColor="#FFFFFF"
+                android:textColorHint="#777780"
+                android:textSize="15sp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:singleLine="true"
+                android:inputType="textCapSentences"
+                android:imeOptions="actionNext" />
+
+            <!-- Выбор игры -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Игра"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/postGameSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_search"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:spinnerMode="dropdown" />
+
+            <!-- Текст публикации -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Текст публикации"
+                android:textColor="#FFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/postContent"
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_search"
+                android:gravity="top|start"
+                android:hint="Расскажи о прохождении, поделись советами или впечатлениями..."
+                android:textColor="#FFFFFF"
+                android:textColorHint="#777780"
+                android:textSize="15sp"
+                android:padding="16dp"
+                android:inputType="textCapSentences|textMultiLine"
+
+                android:scrollbars="vertical" />
+
+            <!-- Подсказка -->
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Совет: добавь интересный скриншот и расскажи, что происходит на нём."
+                android:textColor="#777780"
+                android:textSize="12sp" />
+
+            <!-- Кнопка публикации -->
+
+            <Button
+                android:id="@+id/publishButton"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="28dp"
+                android:background="@drawable/bg_create_button"
+                android:text="Опубликовать"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:text="Твоя публикация появится в ленте GamerHub"
+                android:textColor="#777780"
+                android:textSize="12sp" />
+
+        </LinearLayout>
+
+    </ScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
