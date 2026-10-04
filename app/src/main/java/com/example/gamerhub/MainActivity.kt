@@ -294,21 +294,86 @@ class MainActivity : AppCompatActivity() {
     // =========================================================
     // Показываем игры в RecyclerView
     // =========================================================
+    private fun openGameDetails(game: Game) {
 
+        pageContainer.removeAllViews()
+
+        val view = LayoutInflater.from(this)
+            .inflate(
+                R.layout.screen_game_details,
+                pageContainer,
+                false
+            )
+
+        pageContainer.addView(view)
+
+
+        val image = view.findViewById<ImageView>(
+            R.id.gameDetailsImage
+        )
+
+        val title = view.findViewById<TextView>(
+            R.id.gameDetailsTitle
+        )
+
+        val genre = view.findViewById<TextView>(
+            R.id.gameDetailsGenre
+        )
+
+        val description = view.findViewById<TextView>(
+            R.id.gameDetailsDescription
+        )
+
+        val backButton = view.findViewById<TextView>(
+            R.id.backButton
+        )
+
+
+        // Загружаем картинку
+
+        val imageId = resources.getIdentifier(
+            game.image,
+            "drawable",
+            packageName
+        )
+
+        image.setImageResource(imageId)
+
+
+        // Загружаем данные игры
+
+        title.text = game.title
+
+        genre.text = game.genre
+
+        description.text =
+            "Информация об игре ${game.title} появится здесь."
+
+
+        // Кнопка назад
+
+        backButton.setOnClickListener {
+
+            openHomePage()
+
+            setActiveNav(R.id.navHome)
+        }
+    }
     private fun showGames(games: List<Game>) {
 
         val recyclerView = pageContainer.findViewById<RecyclerView>(
             R.id.gamesRecyclerView
         )
 
-        // Две карточки в одной строке
         recyclerView.layoutManager = GridLayoutManager(
             this,
             2
         )
 
-        // Передаём игры в адаптер
-        recyclerView.adapter = GameAdapter(games)
+        recyclerView.adapter = GameAdapter(games) { game ->
+
+            openGameDetails(game)
+        }
     }
 
 

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121216">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Кнопка назад -->
+
+        <TextView
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Назад"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:padding="8dp" />
+
+        <!-- Большая картинка игры -->
+
+        <ImageView
+            android:id="@+id/gameDetailsImage"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="12dp"
+            android:scaleType="centerCrop" />
+
+        <!-- Название -->
+
+        <TextView
+            android:id="@+id/gameDetailsTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="Minecraft"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <!-- Жанр -->
+
+        <TextView
+            android:id="@+id/gameDetailsGenre"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Sandbox • Open World"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp" />
+
+        <!-- Разделитель -->
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="20dp"
+            android:background="#292932" />
+
+        <!-- Описание -->
+
+        <TextView
+            android:id="@+id/gameDetailsDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Описание игры появится здесь."
+            android:textColor="#DDDDDD"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp" />
+
+        <!-- Заголовок публикаций -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Публикации"
+            android:textColor="#FFFFFF"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <!-- Пока пустое место под будущие публикации -->
+
+        <TextView
+            android:id="@+id/gamePostsPlaceholder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Здесь будут публикации об этой игре."
+            android:textColor="#777780"
+            android:textSize="15sp" />
+
+    </LinearLayout>
+
+</ScrollView>
