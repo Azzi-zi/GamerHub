@@ -36,7 +36,14 @@ class GameAdapter(
 
         val game = games[position]
 
-        holder.image.setImageResource(game.image)
+        val imageId = holder.itemView.context.resources.getIdentifier(
+            game.image,
+            "drawable",
+            holder.itemView.context.packageName
+        )
+
+        holder.image.setImageResource(imageId)
+
         holder.title.text = game.title
         holder.genre.text = game.genre
     }

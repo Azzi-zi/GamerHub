@@ -1,0 +1,21 @@
+package com.example.gamerhub
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+
+@Dao
+interface GameDao {
+
+    @Query("SELECT * FROM games")
+    suspend fun getAllGames(): List<Game>
+
+    @Query("SELECT COUNT(*) FROM games")
+    suspend fun getGameCount(): Int
+
+    @Insert
+    suspend fun insertGame(game: Game)
+
+    @Insert
+    suspend fun insertGames(games: List<Game>)
+}
