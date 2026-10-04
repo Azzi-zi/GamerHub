@@ -37,7 +37,9 @@ class MainActivity : AppCompatActivity() {
             applicationContext,
             GamerHubDatabase::class.java,
             "gamerhub_database"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
 
@@ -228,47 +230,53 @@ class MainActivity : AppCompatActivity() {
 
                 // Первоначальные данные
                 val initialGames = listOf(
-
                     Game(
                         title = "Minecraft",
                         genre = "Sandbox • Open World",
-                        image = "mincraft"
+                        image = "mincraft",
+                        description = "Песочница с огромным открытым миром, где игроки могут исследовать мир, добывать ресурсы, строить сооружения и создавать собственные приключения."
                     ),
 
                     Game(
                         title = "World of Tanks",
                         genre = "Online • Action",
-                        image = "world_of_tanks"
+                        image = "world_of_tanks",
+                        description = "Онлайн-игра о танковых сражениях. Игроки управляют боевыми машинами и сражаются друг с другом в командных боях."
                     ),
 
                     Game(
                         title = "Baldur's Gate 3",
                         genre = "RPG • Adventure",
-                        image = "bal_gate"
+                        image = "bal_gate",
+                        description = "Большая ролевая игра с исследованием мира, персонажами, диалогами и множеством решений, влияющих на развитие приключения."
                     ),
 
                     Game(
                         title = "GTA VI",
                         genre = "Action • Open World",
-                        image = "gta"
+                        image = "gta",
+                        description = "Приключенческая игра с открытым миром, события которой разворачиваются в современном криминальном мире."
                     ),
 
                     Game(
                         title = "Genshin Impact",
                         genre = "RPG • Open World",
-                        image = "genshin_impact"
+                        image = "genshin_impact",
+                        description = "Ролевая игра с открытым миром, исследованием локаций, сражениями и большим количеством игровых персонажей."
                     ),
 
                     Game(
                         title = "Portal 2",
                         genre = "Puzzle • Adventure",
-                        image = "portal"
+                        image = "portal",
+                        description = "Головоломка от первого лица, в которой игрок использует портальную пушку для решения пространственных задач."
                     ),
 
                     Game(
                         title = "Wuthering Waves",
                         genre = "RPG • Action",
-                        image = "wuwa"
+                        image = "wuwa",
+                        description = "Экшен-RPG с открытым миром, исследованием локаций и динамическими сражениями."
                     )
                 )
 
@@ -346,10 +354,7 @@ class MainActivity : AppCompatActivity() {
 
         genre.text = game.genre
 
-        description.text =
-            "Информация об игре ${game.title} появится здесь."
-
-
+        description.text = game.description
         // Кнопка назад
 
         backButton.setOnClickListener {
