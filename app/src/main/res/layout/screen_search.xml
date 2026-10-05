@@ -81,7 +81,7 @@
                     android:layout_height="24dp"
                     android:contentDescription="Очистить поиск"
                     android:src="@android:drawable/ic_menu_close_clear_cancel"
-                    android:tint="#888892"
+                    app:tint="#888892"
                     android:visibility="gone" />
 
             </LinearLayout>
@@ -259,236 +259,34 @@
             </LinearLayout>
 
             <!-- Карточки игр -->
-            <GridLayout
-                android:id="@+id/searchGamesGrid"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchGamesRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:columnCount="2"
-                android:orientation="horizontal"
-                android:useDefaultMargins="false">
+                android:layout_marginTop="12dp"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:paddingBottom="8dp" />
+            <TextView
+                android:id="@+id/searchResultsTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Результаты поиска"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
-                <!-- Minecraft -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/mincraft"
-                        android:contentDescription="Minecraft" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Minecraft"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Песочница"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- World of Tanks -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="6dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/world_of_tanks"
-                        android:contentDescription="World of Tanks" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="World of Tanks"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Экшен • Онлайн"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Baldur's Gate 3 -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginTop="22dp"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/bal_gate"
-                        android:contentDescription="Baldur's Gate 3" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Baldur's Gate 3"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="RPG"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Genshin Impact -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginTop="22dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/genshin_impact"
-                        android:contentDescription="Genshin Impact" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Genshin Impact"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="RPG • Приключения"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Portal 2 -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginTop="22dp"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/portal"
-                        android:contentDescription="Portal 2" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Portal 2"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Головоломка"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Wuthering Waves -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginTop="22dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="115dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/wuwa"
-                        android:contentDescription="Wuthering Waves" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Wuthering Waves"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Экшен • RPG"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-            </GridLayout>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/searchResultsRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:paddingBottom="20dp"
+                android:visibility="gone" />
 
         </LinearLayout>
 

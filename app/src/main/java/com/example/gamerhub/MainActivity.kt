@@ -1,5 +1,8 @@
 package com.example.gamerhub
 
+import android.widget.GridLayout
+import android.text.Editable
+import android.text.TextWatcher
 import android.graphics.Color
 import android.os.Bundle
 import android.text.SpannableString
@@ -7,6 +10,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -21,6 +25,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.Room
 
+import com.bumptech.glide.Glide
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,11 +34,19 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
-    // Контейнер, в котором будут открываться разные экраны
+    // =========================================================
+    // Контейнер, в котором открываются разные экраны
+    // =========================================================
+
     private lateinit var pageContainer: FrameLayout
 
+
+    // =========================================================
     // Подключение базы данных Room
+    // =========================================================
+
     private val database by lazy {
+
         Room.databaseBuilder(
             applicationContext,
             GamerHubDatabase::class.java,
@@ -43,18 +57,42 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // =========================================================
+    // Repository
+    // =========================================================
+
+    private val repository by lazy {
+
+        GameRepository(
+            database.gameDao()
+        )
+    }
+
+
+    // =========================================================
+    // Создание Activity
+    // =========================================================
+
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge()
 
         setContentView(R.layout.activity_main)
 
+
         // Находим контейнер страниц
-        pageContainer = findViewById(R.id.pageContainer)
+
+        pageContainer = findViewById(
+            R.id.pageContainer
+        )
 
 
-        // Обработка системных отступов
+        // =====================================================
+        // Системные отступы
+        // =====================================================
+
         ViewCompat.setOnApplyWindowInsetsListener(
             findViewById(R.id.main)
         ) { v, insets ->
@@ -74,55 +112,96 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        // Кнопка "Главная"
-        findViewById<LinearLayout>(R.id.navHome).setOnClickListener {
+        // =====================================================
+        // Нижняя навигация
+        // =====================================================
+
+
+        // Главная
+
+        findViewById<LinearLayout>(
+            R.id.navHome
+        ).setOnClickListener {
 
             openHomePage()
 
-            setActiveNav(R.id.navHome)
+            setActiveNav(
+                R.id.navHome
+            )
         }
 
 
-        // Кнопка "Поиск"
-        findViewById<LinearLayout>(R.id.navSearch).setOnClickListener {
+        // Поиск
 
-            openPage(R.layout.screen_search)
+        findViewById<LinearLayout>(
+            R.id.navSearch
+        ).setOnClickListener {
 
-            setActiveNav(R.id.navSearch)
+            openSearchPage()
+
+            setActiveNav(
+                R.id.navSearch
+            )
         }
 
 
-        // Кнопка "Создать"
-        findViewById<LinearLayout>(R.id.navCreate).setOnClickListener {
+        // Создать
 
-            openPage(R.layout.screen_create)
+        findViewById<LinearLayout>(
+            R.id.navCreate
+        ).setOnClickListener {
 
-            setActiveNav(R.id.navCreate)
+            openPage(
+                R.layout.screen_create
+            )
+
+            setActiveNav(
+                R.id.navCreate
+            )
         }
 
 
-        // Кнопка "Чаты"
-        findViewById<LinearLayout>(R.id.navChats).setOnClickListener {
+        // Чаты
 
-            openPage(R.layout.screen_chats)
+        findViewById<LinearLayout>(
+            R.id.navChats
+        ).setOnClickListener {
 
-            setActiveNav(R.id.navChats)
+            openPage(
+                R.layout.screen_chats
+            )
+
+            setActiveNav(
+                R.id.navChats
+            )
         }
 
 
-        // Кнопка "Профиль"
-        findViewById<LinearLayout>(R.id.navProfile).setOnClickListener {
+        // Профиль
 
-            openPage(R.layout.screen_profile)
+        findViewById<LinearLayout>(
+            R.id.navProfile
+        ).setOnClickListener {
 
-            setActiveNav(R.id.navProfile)
+            openPage(
+                R.layout.screen_profile
+            )
+
+            setActiveNav(
+                R.id.navProfile
+            )
         }
 
 
-        // Открываем главный экран при запуске приложения
+        // =====================================================
+        // Открываем главную страницу при запуске
+        // =====================================================
+
         openHomePage()
 
-        setActiveNav(R.id.navHome)
+        setActiveNav(
+            R.id.navHome
+        )
     }
 
 
@@ -132,10 +211,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun openPage(layoutId: Int) {
 
-        // Очищаем предыдущую страницу
+        // Удаляем предыдущий экран
+
         pageContainer.removeAllViews()
 
+
         // Загружаем XML
+
         val view = LayoutInflater.from(this)
             .inflate(
                 layoutId,
@@ -143,7 +225,9 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
-        // Добавляем страницу в контейнер
+
+        // Добавляем экран
+
         pageContainer.addView(view)
     }
 
@@ -154,10 +238,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun openHomePage() {
 
-        // Очищаем старую страницу
+        // Очищаем предыдущий экран
+
         pageContainer.removeAllViews()
 
+
         // Загружаем screen_home.xml
+
         val view = LayoutInflater.from(this)
             .inflate(
                 R.layout.screen_home,
@@ -165,26 +252,34 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
+
         // Добавляем экран
+
         pageContainer.addView(view)
 
 
-        // -----------------------------------------------------
+        // =====================================================
         // Логотип GamerHub
-        // -----------------------------------------------------
+        // =====================================================
 
         val logoText = view.findViewById<TextView>(
             R.id.logoText
         )
 
+
         val logo = "GamerHub"
 
-        val spannable = SpannableString(logo)
+        val spannable = SpannableString(
+            logo
+        )
 
 
         // Gamer — белый
+
         spannable.setSpan(
-            ForegroundColorSpan(Color.WHITE),
+            ForegroundColorSpan(
+                Color.WHITE
+            ),
             0,
             4,
             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -192,9 +287,14 @@ class MainActivity : AppCompatActivity() {
 
 
         // Hub — фиолетовый
+
         spannable.setSpan(
             ForegroundColorSpan(
-                Color.rgb(145, 90, 255)
+                Color.rgb(
+                    145,
+                    90,
+                    255
+                )
             ),
             4,
             8,
@@ -205,93 +305,40 @@ class MainActivity : AppCompatActivity() {
         logoText.text = spannable
 
 
-        // -----------------------------------------------------
-        // Загружаем игры из Room
-        // -----------------------------------------------------
+        // =====================================================
+        // Загружаем игры
+        // =====================================================
 
         loadGames()
     }
 
 
     // =========================================================
-    // Загрузка игр из базы данных
+    // Загрузка игр из Room
     // =========================================================
 
     private fun loadGames() {
 
-        // Работа с базой выполняется в отдельном потоке
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch(
+            Dispatchers.IO
+        ) {
 
-            val dao = database.gameDao()
+            // Если база пустая —
+            // добавляем наши первоначальные игры
 
-
-            // Проверяем, есть ли уже игры
-            if (dao.getGameCount() == 0) {
-
-                // Первоначальные данные
-                val initialGames = listOf(
-                    Game(
-                        title = "Minecraft",
-                        genre = "Sandbox • Open World",
-                        image = "mincraft",
-                        description = "Песочница с огромным открытым миром, где игроки могут исследовать мир, добывать ресурсы, строить сооружения и создавать собственные приключения."
-                    ),
-
-                    Game(
-                        title = "World of Tanks",
-                        genre = "Online • Action",
-                        image = "world_of_tanks",
-                        description = "Онлайн-игра о танковых сражениях. Игроки управляют боевыми машинами и сражаются друг с другом в командных боях."
-                    ),
-
-                    Game(
-                        title = "Baldur's Gate 3",
-                        genre = "RPG • Adventure",
-                        image = "bal_gate",
-                        description = "Большая ролевая игра с исследованием мира, персонажами, диалогами и множеством решений, влияющих на развитие приключения."
-                    ),
-
-                    Game(
-                        title = "GTA VI",
-                        genre = "Action • Open World",
-                        image = "gta",
-                        description = "Приключенческая игра с открытым миром, события которой разворачиваются в современном криминальном мире."
-                    ),
-
-                    Game(
-                        title = "Genshin Impact",
-                        genre = "RPG • Open World",
-                        image = "genshin_impact",
-                        description = "Ролевая игра с открытым миром, исследованием локаций, сражениями и большим количеством игровых персонажей."
-                    ),
-
-                    Game(
-                        title = "Portal 2",
-                        genre = "Puzzle • Adventure",
-                        image = "portal",
-                        description = "Головоломка от первого лица, в которой игрок использует портальную пушку для решения пространственных задач."
-                    ),
-
-                    Game(
-                        title = "Wuthering Waves",
-                        genre = "RPG • Action",
-                        image = "wuwa",
-                        description = "Экшен-RPG с открытым миром, исследованием локаций и динамическими сражениями."
-                    )
-                )
+            repository.loadInitialGames()
 
 
-                // Добавляем игры в базу
-                dao.insertGames(initialGames)
-            }
+            // Получаем игры
 
-
-            // Получаем игры из базы
-            val games = dao.getAllGames()
+            val games = repository.getGames()
 
 
             // Возвращаемся в главный поток
-            withContext(Dispatchers.Main) {
+
+            withContext(
+                Dispatchers.Main
+            ) {
 
                 showGames(games)
             }
@@ -300,11 +347,254 @@ class MainActivity : AppCompatActivity() {
 
 
     // =========================================================
-    // Показываем игры в RecyclerView
+    // Показываем игры на главной
     // =========================================================
-    private fun openGameDetails(game: Game) {
+
+    private fun showGames(
+        games: List<Game>
+    ) {
+
+        val recyclerView =
+            pageContainer.findViewById<RecyclerView>(
+                R.id.gamesRecyclerView
+            )
+
+
+        recyclerView.layoutManager =
+            GridLayoutManager(
+                this,
+                2
+            )
+
+
+        recyclerView.adapter =
+            GameAdapter(games) { game ->
+
+                openGameDetails(game)
+            }
+    }
+
+
+    // =========================================================
+    // Экран поиска
+    // =========================================================
+
+    private fun openSearchPage() {
+
+        // Очищаем предыдущий экран
 
         pageContainer.removeAllViews()
+
+
+        // Загружаем screen_search.xml
+
+        val view = LayoutInflater.from(this)
+            .inflate(
+                R.layout.screen_search,
+                pageContainer,
+                false
+            )
+
+
+        // Добавляем экран
+
+        pageContainer.addView(view)
+
+
+        // Настраиваем поиск
+
+        setupSearchPage(view)
+    }
+
+
+    // =========================================================
+// Настройка поиска
+// =========================================================
+
+    private fun setupSearchPage(view: View) {
+
+        val searchInput =
+            view.findViewById<EditText>(R.id.searchGamesInput)
+
+        val clearButton =
+            view.findViewById<ImageView>(R.id.clearSearchButton)
+
+        // Первоначальные популярные игры
+        val gamesRecyclerView =
+            view.findViewById<RecyclerView>(R.id.searchGamesRecyclerView)
+
+        // Результаты поиска
+        val searchResultsRecyclerView =
+            view.findViewById<RecyclerView>(R.id.searchResultsRecyclerView)
+
+        val resultsTitle =
+            view.findViewById<TextView>(R.id.searchResultsTitle)
+
+        // Адаптер для первоначальных игр
+        val gamesAdapter =
+            GameAdapter(emptyList()) { game ->
+                openGameDetails(game)
+            }
+
+        gamesRecyclerView.layoutManager =
+            GridLayoutManager(this, 2)
+
+        gamesRecyclerView.adapter = gamesAdapter
+
+        // Загружаем игры из Room
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            repository.loadInitialGames()
+
+            val games =
+                repository.getGames()
+
+            withContext(Dispatchers.Main) {
+                gamesAdapter.updateGames(games)
+            }
+        }
+
+        // Адаптер результатов поиска
+        val searchAdapter =
+            SearchGameAdapter(emptyList()) { game ->
+                openGameDetails(game)
+            }
+
+        searchResultsRecyclerView.layoutManager =
+            GridLayoutManager(this, 2)
+
+        searchResultsRecyclerView.adapter =
+            searchAdapter
+
+        // Поиск при вводе текста
+        searchInput.addTextChangedListener(
+            object : TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {
+                }
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+
+                    val query =
+                        s?.toString()?.trim() ?: ""
+
+                    if (query.isBlank()) {
+
+                        clearButton.visibility = View.GONE
+
+                        gamesRecyclerView.visibility =
+                            View.VISIBLE
+
+                        resultsTitle.visibility =
+                            View.GONE
+
+                        searchResultsRecyclerView.visibility =
+                            View.GONE
+
+                        searchAdapter.updateGames(
+                            emptyList()
+                        )
+
+                        return
+                    }
+
+                    clearButton.visibility =
+                        View.VISIBLE
+
+                    gamesRecyclerView.visibility =
+                        View.GONE
+
+                    resultsTitle.visibility =
+                        View.VISIBLE
+
+                    searchResultsRecyclerView.visibility =
+                        View.VISIBLE
+
+                    resultsTitle.text =
+                        "Поиск: $query"
+
+                    searchGames(
+                        query,
+                        searchAdapter,
+                        resultsTitle
+                    )
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) {
+                }
+            }
+        )
+
+        // Кнопка очистки
+        clearButton.setOnClickListener {
+
+            searchInput.text.clear()
+
+            searchInput.requestFocus()
+        }
+    }
+
+
+    // =========================================================
+// Поиск игр в Room
+// =========================================================
+
+    private fun searchGames(
+        query: String,
+        adapter: SearchGameAdapter,
+        resultsTitle: TextView
+    ) {
+
+        if (query.isBlank()) {
+            adapter.updateGames(emptyList())
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            val games =
+                repository.searchGames(query)
+
+            withContext(Dispatchers.Main) {
+
+                adapter.updateGames(games)
+
+                resultsTitle.text =
+                    if (games.isEmpty()) {
+                        "Ничего не найдено"
+                    } else {
+                        "Найдено: ${games.size}"
+                    }
+            }
+        }
+    }
+
+    // =========================================================
+    // Экран информации об игре
+    // =========================================================
+
+    private fun openGameDetails(
+        game: Game
+    ) {
+
+        // Очищаем предыдущий экран
+
+        pageContainer.removeAllViews()
+
+
+        // Загружаем XML
 
         val view = LayoutInflater.from(this)
             .inflate(
@@ -313,71 +603,101 @@ class MainActivity : AppCompatActivity() {
                 false
             )
 
+
+        // Добавляем экран
+
         pageContainer.addView(view)
 
 
-        val image = view.findViewById<ImageView>(
-            R.id.gameDetailsImage
-        )
+        // =====================================================
+        // Находим элементы
+        // =====================================================
 
-        val title = view.findViewById<TextView>(
-            R.id.gameDetailsTitle
-        )
-
-        val genre = view.findViewById<TextView>(
-            R.id.gameDetailsGenre
-        )
-
-        val description = view.findViewById<TextView>(
-            R.id.gameDetailsDescription
-        )
-
-        val backButton = view.findViewById<TextView>(
-            R.id.backButton
-        )
+        val image =
+            view.findViewById<ImageView>(
+                R.id.gameDetailsImage
+            )
 
 
+        val title =
+            view.findViewById<TextView>(
+                R.id.gameDetailsTitle
+            )
+
+
+        val genre =
+            view.findViewById<TextView>(
+                R.id.gameDetailsGenre
+            )
+
+
+        val description =
+            view.findViewById<TextView>(
+                R.id.gameDetailsDescription
+            )
+
+
+        val backButton =
+            view.findViewById<TextView>(
+                R.id.backButton
+            )
+
+
+        // =====================================================
         // Загружаем картинку
+        // =====================================================
 
-        val imageId = resources.getIdentifier(
-            game.image,
-            "drawable",
-            packageName
-        )
+        if (
+            game.image.startsWith("http")
+        ) {
 
-        image.setImageResource(imageId)
+            // Картинка из интернета
+
+            Glide.with(image)
+                .load(game.image)
+                .into(image)
+
+        } else {
+
+            // Локальная картинка из drawable
+
+            val imageId =
+                resources.getIdentifier(
+                    game.image,
+                    "drawable",
+                    packageName
+                )
 
 
-        // Загружаем данные игры
+            image.setImageResource(
+                imageId
+            )
+        }
+
+
+        // =====================================================
+        // Загружаем информацию об игре
+        // =====================================================
 
         title.text = game.title
 
         genre.text = game.genre
 
-        description.text = game.description
-        // Кнопка назад
+        description.text =
+            game.description
+
+
+        // =====================================================
+        // Кнопка "Назад"
+        // =====================================================
 
         backButton.setOnClickListener {
 
             openHomePage()
 
-            setActiveNav(R.id.navHome)
-        }
-    }
-    private fun showGames(games: List<Game>) {
-
-        val recyclerView = pageContainer.findViewById<RecyclerView>(
-            R.id.gamesRecyclerView
-        )
-
-        recyclerView.layoutManager = GridLayoutManager(
-            this,
-            2
-        )
-
-        recyclerView.adapter = GameAdapter(games) { game ->
-
-            openGameDetails(game)
+            setActiveNav(
+                R.id.navHome
+            )
         }
     }
 
@@ -386,63 +706,99 @@ class MainActivity : AppCompatActivity() {
     // Нижняя навигация
     // =========================================================
 
-    private fun setActiveNav(activeId: Int) {
+    private fun setActiveNav(
+        activeId: Int
+    ) {
 
-        // Все кнопки нижней навигации
+        // Все элементы навигации
+
         val navIds = listOf(
+
             R.id.navHome,
+
             R.id.navSearch,
+
             R.id.navCreate,
+
             R.id.navChats,
+
             R.id.navProfile
         )
 
 
-        // Цвет активной кнопки
-        val activeColor = Color.rgb(
-            139,
-            92,
-            246
-        )
+        // Цвет активного элемента
 
-
-        // Цвет неактивной кнопки
-        val inactiveColor = Color.rgb(
-            119,
-            119,
-            128
-        )
-
-
-        // Перебираем все кнопки
-        for (navId in navIds) {
-
-            val navigationItem = findViewById<LinearLayout>(
-                navId
+        val activeColor =
+            Color.rgb(
+                139,
+                92,
+                246
             )
 
 
-            // Первый элемент — иконка
-            val icon = navigationItem.getChildAt(0) as ImageView
+        // Цвет неактивного элемента
+
+        val inactiveColor =
+            Color.rgb(
+                119,
+                119,
+                128
+            )
 
 
-            // Второй элемент — текст
-            val text = navigationItem.getChildAt(1) as TextView
+        // Перебираем элементы
+
+        for (navId in navIds) {
+
+            val navigationItem =
+                findViewById<LinearLayout>(
+                    navId
+                )
 
 
-            if (navId == activeId) {
+            // Первый элемент —
+            // ImageView
 
-                // Активная кнопка
-                text.setTextColor(activeColor)
+            val icon =
+                navigationItem.getChildAt(
+                    0
+                ) as ImageView
 
-                icon.setColorFilter(activeColor)
+
+            // Второй элемент —
+            // TextView
+
+            val text =
+                navigationItem.getChildAt(
+                    1
+                ) as TextView
+
+
+            if (
+                navId == activeId
+            ) {
+
+                // Активный
+
+                text.setTextColor(
+                    activeColor
+                )
+
+                icon.setColorFilter(
+                    activeColor
+                )
 
             } else {
 
-                // Неактивная кнопка
-                text.setTextColor(inactiveColor)
+                // Неактивный
 
-                icon.setColorFilter(inactiveColor)
+                text.setTextColor(
+                    inactiveColor
+                )
+
+                icon.setColorFilter(
+                    inactiveColor
+                )
             }
         }
     }

@@ -13,6 +13,12 @@ interface GameDao {
     @Query("SELECT COUNT(*) FROM games")
     suspend fun getGameCount(): Int
 
+    @Query("""
+        SELECT * FROM games
+        WHERE title LIKE '%' || :query || '%'
+    """)
+    suspend fun searchGames(query: String): List<Game>
+
     @Insert
     suspend fun insertGame(game: Game)
 
