@@ -1,12 +1,11 @@
 package com.example.gamerhub
 
-import android.widget.GridLayout
-import android.text.Editable
-import android.text.TextWatcher
 import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.LayoutInflater
 import android.view.View
@@ -34,19 +33,13 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
-    // =========================================================
-    // Контейнер, в котором открываются разные экраны
-    // =========================================================
-
     private lateinit var pageContainer: FrameLayout
 
-
-    // =========================================================
-    // Подключение базы данных Room
-    // =========================================================
+    // ============================================================
+    // DATABASE
+    // ============================================================
 
     private val database by lazy {
-
         Room.databaseBuilder(
             applicationContext,
             GamerHubDatabase::class.java,
@@ -56,52 +49,32 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
-
-    // =========================================================
-    // Repository
-    // =========================================================
-
     private val repository by lazy {
-
-        GameRepository(
-            database.gameDao()
-        )
+        GameRepository(database.gameDao())
     }
 
 
-    // =========================================================
-    // Создание Activity
-    // =========================================================
+    // ============================================================
+    // ON CREATE
+    // ============================================================
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge()
-
         setContentView(R.layout.activity_main)
 
-
-        // Находим контейнер страниц
-
-        pageContainer = findViewById(
-            R.id.pageContainer
-        )
-
-
-        // =====================================================
-        // Системные отступы
-        // =====================================================
+        pageContainer = findViewById(R.id.pageContainer)
 
         ViewCompat.setOnApplyWindowInsetsListener(
             findViewById(R.id.main)
-        ) { v, insets ->
+        ) { view, insets ->
 
             val systemBars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars()
             )
 
-            v.setPadding(
+            view.setPadding(
                 systemBars.left,
                 systemBars.top,
                 systemBars.right,
@@ -111,362 +84,343 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-
-        // =====================================================
-        // Нижняя навигация
-        // =====================================================
-
-
-        // Главная
-
-        findViewById<LinearLayout>(
-            R.id.navHome
-        ).setOnClickListener {
-
-            openHomePage()
-
-            setActiveNav(
-                R.id.navHome
-            )
-        }
-
-
-        // Поиск
-
-        findViewById<LinearLayout>(
-            R.id.navSearch
-        ).setOnClickListener {
-
-            openSearchPage()
-
-            setActiveNav(
-                R.id.navSearch
-            )
-        }
-
-
-        // Создать
-
-        findViewById<LinearLayout>(
-            R.id.navCreate
-        ).setOnClickListener {
-
-            openPage(
-                R.layout.screen_create
-            )
-
-            setActiveNav(
-                R.id.navCreate
-            )
-        }
-
-
-        // Чаты
-
-        findViewById<LinearLayout>(
-            R.id.navChats
-        ).setOnClickListener {
-
-            openPage(
-                R.layout.screen_chats
-            )
-
-            setActiveNav(
-                R.id.navChats
-            )
-        }
-
-
-        // Профиль
-
-        findViewById<LinearLayout>(
-            R.id.navProfile
-        ).setOnClickListener {
-
-            openPage(
-                R.layout.screen_profile
-            )
-
-            setActiveNav(
-                R.id.navProfile
-            )
-        }
-
-
-        // =====================================================
-        // Открываем главную страницу при запуске
-        // =====================================================
+        setupBottomNavigation()
 
         openHomePage()
 
         setActiveNav(
-            R.id.navHome
+            findViewById(R.id.navHome)
         )
     }
 
 
-    // =========================================================
-    // Открытие обычной страницы
-    // =========================================================
+    // ============================================================
+    // BOTTOM NAVIGATION
+    // ============================================================
+
+    private fun setupBottomNavigation() {
+
+        val navHome = findViewById<LinearLayout>(R.id.navHome)
+        val navSearch = findViewById<LinearLayout>(R.id.navSearch)
+        val navCreate = findViewById<LinearLayout>(R.id.navCreate)
+        val navChats = findViewById<LinearLayout>(R.id.navChats)
+        val navProfile = findViewById<LinearLayout>(R.id.navProfile)
+
+        navHome.setOnClickListener {
+            openHomePage()
+            setActiveNav(navHome)
+        }
+
+        navSearch.setOnClickListener {
+            openSearchPage()
+            setActiveNav(navSearch)
+        }
+
+        navCreate.setOnClickListener {
+            openPage(R.layout.screen_create)
+            setActiveNav(navCreate)
+        }
+
+        navChats.setOnClickListener {
+            openPage(R.layout.screen_chats)
+            setActiveNav(navChats)
+        }
+
+        navProfile.setOnClickListener {
+            openPage(R.layout.screen_profile)
+            setActiveNav(navProfile)
+        }
+    }
+
+
+    // ============================================================
+    // OPEN PAGE
+    // ============================================================
 
     private fun openPage(layoutId: Int) {
 
-        // Удаляем предыдущий экран
-
         pageContainer.removeAllViews()
 
-
-        // Загружаем XML
-
-        val view = LayoutInflater.from(this)
-            .inflate(
-                layoutId,
-                pageContainer,
-                false
-            )
-
-
-        // Добавляем экран
+        val view = LayoutInflater.from(this).inflate(
+            layoutId,
+            pageContainer,
+            false
+        )
 
         pageContainer.addView(view)
     }
 
 
-    // =========================================================
-    // Главная страница
-    // =========================================================
+    // ============================================================
+    // HOME
+    // ============================================================
 
     private fun openHomePage() {
 
-        // Очищаем предыдущий экран
+        openPage(R.layout.screen_home)
 
-        pageContainer.removeAllViews()
+        val view = pageContainer.getChildAt(0)
 
-
-        // Загружаем screen_home.xml
-
-        val view = LayoutInflater.from(this)
-            .inflate(
-                R.layout.screen_home,
-                pageContainer,
-                false
-            )
-
-
-        // Добавляем экран
-
-        pageContainer.addView(view)
-
-
-        // =====================================================
-        // Логотип GamerHub
-        // =====================================================
-
-        val logoText = view.findViewById<TextView>(
-            R.id.logoText
-        )
-
-
-        val logo = "GamerHub"
-
-        val spannable = SpannableString(
-            logo
-        )
-
-
-        // Gamer — белый
-
-        spannable.setSpan(
-            ForegroundColorSpan(
-                Color.WHITE
-            ),
-            0,
-            4,
-            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        )
-
-
-        // Hub — фиолетовый
-
-        spannable.setSpan(
-            ForegroundColorSpan(
-                Color.rgb(
-                    145,
-                    90,
-                    255
-                )
-            ),
-            4,
-            8,
-            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        )
-
-
-        logoText.text = spannable
-
-
-        // =====================================================
-        // Загружаем игры
-        // =====================================================
-
+        setupHomeLogo(view)
         loadGames()
     }
 
 
-    // =========================================================
-    // Загрузка игр из Room
-    // =========================================================
+    private fun setupHomeLogo(view: View) {
+
+        val title = view.findViewById<TextView>(
+            R.id.logoText
+        )
+
+        val text = "GamerHub"
+
+        val spannable = SpannableString(text)
+
+        spannable.setSpan(
+            ForegroundColorSpan(Color.WHITE),
+            0,
+            5,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        spannable.setSpan(
+            ForegroundColorSpan(
+                Color.rgb(170, 80, 255)
+            ),
+            5,
+            text.length,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        title.text = spannable
+    }
+
+
+    // ============================================================
+    // LOAD GAMES
+    // ============================================================
 
     private fun loadGames() {
 
-        lifecycleScope.launch(
-            Dispatchers.IO
-        ) {
-
-            // Если база пустая —
-            // добавляем наши первоначальные игры
+        lifecycleScope.launch(Dispatchers.IO) {
 
             repository.loadInitialGames()
 
-
-            // Получаем игры
-
             val games = repository.getGames()
 
-
-            // Возвращаемся в главный поток
-
-            withContext(
-                Dispatchers.Main
-            ) {
-
-                showGames(games)
+            withContext(Dispatchers.Main) {
+                showHomeGames(games)
             }
         }
     }
 
 
-    // =========================================================
-    // Показываем игры на главной
-    // =========================================================
+    // ============================================================
+    // HOME GAMES
+    // ============================================================
 
-    private fun showGames(
-        games: List<Game>
-    ) {
+    private fun showHomeGames(games: List<Game>) {
 
-        val recyclerView =
-            pageContainer.findViewById<RecyclerView>(
-                R.id.gamesRecyclerView
-            )
+        val recyclerView = pageContainer.findViewById<RecyclerView>(
+            R.id.gamesRecyclerView
+        )
 
+        recyclerView.layoutManager = GridLayoutManager(
+            this,
+            2
+        )
 
-        recyclerView.layoutManager =
-            GridLayoutManager(
-                this,
-                2
-            )
-
-
-        recyclerView.adapter =
-            GameAdapter(games) { game ->
-
-                openGameDetails(game)
-            }
+        recyclerView.adapter = GameAdapter(games) { game ->
+            openGameDetails(game)
+        }
     }
 
 
-    // =========================================================
-    // Экран поиска
-    // =========================================================
+    // ============================================================
+    // SEARCH
+    // ============================================================
 
     private fun openSearchPage() {
 
-        // Очищаем предыдущий экран
+        openPage(R.layout.screen_search)
 
-        pageContainer.removeAllViews()
-
-
-        // Загружаем screen_search.xml
-
-        val view = LayoutInflater.from(this)
-            .inflate(
-                R.layout.screen_search,
-                pageContainer,
-                false
-            )
-
-
-        // Добавляем экран
-
-        pageContainer.addView(view)
-
-
-        // Настраиваем поиск
+        val view = pageContainer.getChildAt(0)
 
         setupSearchPage(view)
     }
 
 
-    // =========================================================
-// Настройка поиска
-// =========================================================
-
     private fun setupSearchPage(view: View) {
 
-        val searchInput =
-            view.findViewById<EditText>(R.id.searchGamesInput)
+        val searchInput = view.findViewById<EditText>(
+            R.id.searchGamesInput
+        )
 
-        val clearButton =
-            view.findViewById<ImageView>(R.id.clearSearchButton)
+        val clearButton = view.findViewById<ImageView>(
+            R.id.clearSearchButton
+        )
 
-        // Первоначальные популярные игры
-        val gamesRecyclerView =
-            view.findViewById<RecyclerView>(R.id.searchGamesRecyclerView)
+        val resultsTitle = view.findViewById<TextView>(
+            R.id.searchResultsTitle
+        )
 
-        // Результаты поиска
-        val searchResultsRecyclerView =
-            view.findViewById<RecyclerView>(R.id.searchResultsRecyclerView)
+        val categoryAll = view.findViewById<TextView>(
+            R.id.categoryAll
+        )
 
-        val resultsTitle =
-            view.findViewById<TextView>(R.id.searchResultsTitle)
+        val categoryAction = view.findViewById<TextView>(
+            R.id.categoryAction
+        )
 
-        // Адаптер для первоначальных игр
-        val gamesAdapter =
-            GameAdapter(emptyList()) { game ->
-                openGameDetails(game)
-            }
+        val categoryRpg = view.findViewById<TextView>(
+            R.id.categoryRpg
+        )
 
-        gamesRecyclerView.layoutManager =
-            GridLayoutManager(this, 2)
+        val categorySandbox = view.findViewById<TextView>(
+            R.id.categorySandbox
+        )
 
-        gamesRecyclerView.adapter = gamesAdapter
+        val categoryOnline = view.findViewById<TextView>(
+            R.id.categoryOnline
+        )
 
-        // Загружаем игры из Room
-        lifecycleScope.launch(Dispatchers.IO) {
+        val trendingMinecraft = view.findViewById<TextView>(
+            R.id.trendingMinecraft
+        )
 
-            repository.loadInitialGames()
+        val trendingGenshin = view.findViewById<TextView>(
+            R.id.trendingGenshin
+        )
 
-            val games =
-                repository.getGames()
+        val trendingGta = view.findViewById<TextView>(
+            R.id.trendingGta
+        )
 
-            withContext(Dispatchers.Main) {
-                gamesAdapter.updateGames(games)
-            }
+
+        // ========================================================
+        // SEARCH RECYCLERVIEW
+        // ========================================================
+
+        val recyclerView = view.findViewById<RecyclerView>(
+            R.id.searchGamesRecyclerView
+        )
+
+        recyclerView.layoutManager = GridLayoutManager(
+            this,
+            2
+        )
+
+        recyclerView.isNestedScrollingEnabled = false
+
+
+        // ========================================================
+        // INITIAL GAMES
+        // ========================================================
+
+        loadSearchGames(
+            recyclerView,
+            resultsTitle
+        )
+
+
+        // ========================================================
+        // CATEGORIES
+        // ========================================================
+
+        categoryAll.setOnClickListener {
+
+            updateCategoryButtons(
+                categoryAll,
+                categoryAction,
+                categoryRpg,
+                categorySandbox,
+                categoryOnline,
+                "Все"
+            )
+
+            loadSearchGames(
+                recyclerView,
+                resultsTitle
+            )
         }
 
-        // Адаптер результатов поиска
-        val searchAdapter =
-            SearchGameAdapter(emptyList()) { game ->
-                openGameDetails(game)
-            }
 
-        searchResultsRecyclerView.layoutManager =
-            GridLayoutManager(this, 2)
+        categoryAction.setOnClickListener {
 
-        searchResultsRecyclerView.adapter =
-            searchAdapter
+            updateCategoryButtons(
+                categoryAll,
+                categoryAction,
+                categoryRpg,
+                categorySandbox,
+                categoryOnline,
+                "Action"
+            )
 
-        // Поиск при вводе текста
+            filterGames(
+                recyclerView,
+                "Action"
+            )
+        }
+
+
+        categoryRpg.setOnClickListener {
+
+            updateCategoryButtons(
+                categoryAll,
+                categoryAction,
+                categoryRpg,
+                categorySandbox,
+                categoryOnline,
+                "RPG"
+            )
+
+            filterGames(
+                recyclerView,
+                "RPG"
+            )
+        }
+
+
+        categorySandbox.setOnClickListener {
+
+            updateCategoryButtons(
+                categoryAll,
+                categoryAction,
+                categoryRpg,
+                categorySandbox,
+                categoryOnline,
+                "Sandbox"
+            )
+
+            filterGames(
+                recyclerView,
+                "Sandbox"
+            )
+        }
+
+
+        categoryOnline.setOnClickListener {
+
+            updateCategoryButtons(
+                categoryAll,
+                categoryAction,
+                categoryRpg,
+                categorySandbox,
+                categoryOnline,
+                "Online"
+            )
+
+            filterGames(
+                recyclerView,
+                "Online"
+            )
+        }
+
+
+        // ========================================================
+        // SEARCH TEXT
+        // ========================================================
+
         searchInput.addTextChangedListener(
             object : TextWatcher {
 
@@ -485,49 +439,48 @@ class MainActivity : AppCompatActivity() {
                     count: Int
                 ) {
 
-                    val query =
-                        s?.toString()?.trim() ?: ""
+                    val query = s
+                        ?.toString()
+                        ?.trim()
+                        ?: ""
 
                     if (query.isBlank()) {
 
                         clearButton.visibility = View.GONE
+                        resultsTitle.visibility = View.GONE
 
-                        gamesRecyclerView.visibility =
-                            View.VISIBLE
-
-                        resultsTitle.visibility =
-                            View.GONE
-
-                        searchResultsRecyclerView.visibility =
-                            View.GONE
-
-                        searchAdapter.updateGames(
-                            emptyList()
+                        loadSearchGames(
+                            recyclerView,
+                            resultsTitle
                         )
 
                         return
                     }
 
-                    clearButton.visibility =
-                        View.VISIBLE
+                    clearButton.visibility = View.VISIBLE
+                    resultsTitle.visibility = View.VISIBLE
 
-                    gamesRecyclerView.visibility =
-                        View.GONE
+                    lifecycleScope.launch(Dispatchers.IO) {
 
-                    resultsTitle.visibility =
-                        View.VISIBLE
+                        val games = repository.searchGames(
+                            query
+                        )
 
-                    searchResultsRecyclerView.visibility =
-                        View.VISIBLE
+                        withContext(Dispatchers.Main) {
 
-                    resultsTitle.text =
-                        "Поиск: $query"
+                            recyclerView.adapter =
+                                GameAdapter(games) { game ->
+                                    openGameDetails(game)
+                                }
 
-                    searchGames(
-                        query,
-                        searchAdapter,
-                        resultsTitle
-                    )
+                            resultsTitle.text =
+                                if (games.isEmpty()) {
+                                    "Ничего не найдено"
+                                } else {
+                                    "Найдено: ${games.size}"
+                                }
+                        }
+                    }
                 }
 
                 override fun afterTextChanged(
@@ -537,268 +490,285 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
-        // Кнопка очистки
+
+        // ========================================================
+        // CLEAR SEARCH
+        // ========================================================
+
         clearButton.setOnClickListener {
-
             searchInput.text.clear()
-
             searchInput.requestFocus()
+        }
+
+
+        // ========================================================
+        // TRENDING
+        // ========================================================
+
+        trendingMinecraft.setOnClickListener {
+
+            searchInput.setText("Minecraft")
+
+            searchInput.setSelection(
+                searchInput.text.length
+            )
+        }
+
+
+        trendingGenshin.setOnClickListener {
+
+            searchInput.setText("Genshin Impact")
+
+            searchInput.setSelection(
+                searchInput.text.length
+            )
+        }
+
+
+        trendingGta.setOnClickListener {
+
+            searchInput.setText("GTA VI")
+
+            searchInput.setSelection(
+                searchInput.text.length
+            )
         }
     }
 
 
-    // =========================================================
-// Поиск игр в Room
-// =========================================================
+    // ============================================================
+    // LOAD SEARCH GAMES
+    // ============================================================
 
-    private fun searchGames(
-        query: String,
-        adapter: SearchGameAdapter,
+    private fun loadSearchGames(
+        recyclerView: RecyclerView,
         resultsTitle: TextView
     ) {
 
-        if (query.isBlank()) {
-            adapter.updateGames(emptyList())
-            return
-        }
-
         lifecycleScope.launch(Dispatchers.IO) {
 
-            val games =
-                repository.searchGames(query)
+            repository.loadInitialGames()
+
+            val games = repository.getGames()
 
             withContext(Dispatchers.Main) {
 
-                adapter.updateGames(games)
+                recyclerView.adapter = GameAdapter(games) { game ->
+                    openGameDetails(game)
+                }
 
-                resultsTitle.text =
-                    if (games.isEmpty()) {
-                        "Ничего не найдено"
-                    } else {
-                        "Найдено: ${games.size}"
+                resultsTitle.visibility = View.GONE
+            }
+        }
+    }
+
+
+    // ============================================================
+    // FILTER GAMES
+    // ============================================================
+
+    private fun filterGames(
+        recyclerView: RecyclerView,
+        category: String
+    ) {
+
+        lifecycleScope.launch(Dispatchers.IO) {
+
+            val games = repository
+                .getGames()
+                .filter {
+                    it.genre.contains(
+                        category,
+                        ignoreCase = true
+                    )
+                }
+
+            withContext(Dispatchers.Main) {
+
+                recyclerView.adapter =
+                    GameAdapter(games) { game ->
+                        openGameDetails(game)
                     }
             }
         }
     }
 
-    // =========================================================
-    // Экран информации об игре
-    // =========================================================
 
-    private fun openGameDetails(
-        game: Game
+    // ============================================================
+    // CATEGORY BUTTONS
+    // ============================================================
+
+    private fun updateCategoryButtons(
+        all: TextView,
+        action: TextView,
+        rpg: TextView,
+        sandbox: TextView,
+        online: TextView,
+        selected: String
     ) {
 
-        // Очищаем предыдущий экран
+        val buttons = listOf(
+            all,
+            action,
+            rpg,
+            sandbox,
+            online
+        )
 
-        pageContainer.removeAllViews()
-
-
-        // Загружаем XML
-
-        val view = LayoutInflater.from(this)
-            .inflate(
-                R.layout.screen_game_details,
-                pageContainer,
-                false
+        // Сначала делаем все категории неактивными
+        buttons.forEach {
+            it.setTextColor(
+                Color.rgb(170, 170, 170)
             )
 
-
-        // Добавляем экран
-
-        pageContainer.addView(view)
-
-
-        // =====================================================
-        // Находим элементы
-        // =====================================================
-
-        val image =
-            view.findViewById<ImageView>(
-                R.id.gameDetailsImage
-            )
-
-
-        val title =
-            view.findViewById<TextView>(
-                R.id.gameDetailsTitle
-            )
-
-
-        val genre =
-            view.findViewById<TextView>(
-                R.id.gameDetailsGenre
-            )
-
-
-        val description =
-            view.findViewById<TextView>(
-                R.id.gameDetailsDescription
-            )
-
-
-        val backButton =
-            view.findViewById<TextView>(
-                R.id.backButton
-            )
-
-
-        // =====================================================
-        // Загружаем картинку
-        // =====================================================
-
-        if (
-            game.image.startsWith("http")
-        ) {
-
-            // Картинка из интернета
-
-            Glide.with(image)
-                .load(game.image)
-                .into(image)
-
-        } else {
-
-            // Локальная картинка из drawable
-
-            val imageId =
-                resources.getIdentifier(
-                    game.image,
-                    "drawable",
-                    packageName
-                )
-
-
-            image.setImageResource(
-                imageId
+            it.setBackgroundResource(
+                R.drawable.bg_category
             )
         }
 
+        // Определяем выбранную категорию
+        val selectedButton = when (selected) {
 
-        // =====================================================
-        // Загружаем информацию об игре
-        // =====================================================
+            "Action" -> action
+            "RPG" -> rpg
+            "Sandbox" -> sandbox
+            "Online" -> online
 
-        title.text = game.title
+            else -> all
+        }
 
-        genre.text = game.genre
+        // Делаем выбранную категорию активной
+        selectedButton.setTextColor(
+            Color.WHITE
+        )
 
-        description.text =
-            game.description
+        selectedButton.setBackgroundResource(
+            R.drawable.bg_category_active
+        )
+    }
+
+    // ============================================================
+    // GAME DETAILS
+    // ============================================================
+
+    private fun openGameDetails(game: Game) {
+
+        openPage(
+            R.layout.screen_game_details
+        )
+
+        val view = pageContainer.getChildAt(0)
 
 
-        // =====================================================
-        // Кнопка "Назад"
-        // =====================================================
+        // --------------------------------------------------------
+        // BACK
+        // --------------------------------------------------------
+
+        val backButton = view.findViewById<View>(
+            R.id.backButton
+        )
 
         backButton.setOnClickListener {
 
             openHomePage()
 
             setActiveNav(
-                R.id.navHome
+                findViewById(R.id.navHome)
             )
         }
+
+
+        // --------------------------------------------------------
+        // IMAGE
+        // --------------------------------------------------------
+
+        val image = view.findViewById<ImageView>(
+            R.id.gameDetailsImage
+        )
+
+        if (game.image.startsWith("http")) {
+
+            Glide.with(this)
+                .load(game.image)
+                .into(image)
+
+        } else {
+
+            val imageId = resources.getIdentifier(
+                game.image,
+                "drawable",
+                packageName
+            )
+
+            if (imageId != 0) {
+                image.setImageResource(imageId)
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // TITLE
+        // --------------------------------------------------------
+
+        view.findViewById<TextView>(
+            R.id.gameDetailsTitle
+        ).text = game.title
+
+
+        // --------------------------------------------------------
+        // GENRE
+        // --------------------------------------------------------
+
+        view.findViewById<TextView>(
+            R.id.gameDetailsGenre
+        ).text = game.genre
+
+
+        // --------------------------------------------------------
+        // DESCRIPTION
+        // --------------------------------------------------------
+
+        view.findViewById<TextView>(
+            R.id.gameDetailsDescription
+        ).text = game.description
     }
 
 
-    // =========================================================
-    // Нижняя навигация
-    // =========================================================
+    // ============================================================
+    // BOTTOM NAVIGATION ACTIVE STATE
+    // ============================================================
 
     private fun setActiveNav(
-        activeId: Int
+        selected: LinearLayout
     ) {
 
-        // Все элементы навигации
-
-        val navIds = listOf(
-
-            R.id.navHome,
-
-            R.id.navSearch,
-
-            R.id.navCreate,
-
-            R.id.navChats,
-
-            R.id.navProfile
+        val navigation = findViewById<LinearLayout>(
+            R.id.navigation
         )
 
+        for (i in 0 until navigation.childCount) {
 
-        // Цвет активного элемента
+            val item = navigation.getChildAt(i)
 
-        val activeColor =
-            Color.rgb(
-                139,
-                92,
-                246
-            )
+            if (item !is LinearLayout) {
+                continue
+            }
 
+            val image = item.getChildAt(0)
+            val text = item.getChildAt(1)
 
-        // Цвет неактивного элемента
-
-        val inactiveColor =
-            Color.rgb(
-                119,
-                119,
-                128
-            )
-
-
-        // Перебираем элементы
-
-        for (navId in navIds) {
-
-            val navigationItem =
-                findViewById<LinearLayout>(
-                    navId
-                )
-
-
-            // Первый элемент —
-            // ImageView
-
-            val icon =
-                navigationItem.getChildAt(
-                    0
-                ) as ImageView
-
-
-            // Второй элемент —
-            // TextView
-
-            val text =
-                navigationItem.getChildAt(
-                    1
-                ) as TextView
-
-
-            if (
-                navId == activeId
-            ) {
-
-                // Активный
-
-                text.setTextColor(
-                    activeColor
-                )
-
-                icon.setColorFilter(
-                    activeColor
-                )
-
+            val color = if (item == selected) {
+                Color.rgb(180, 90, 255)
             } else {
+                Color.rgb(150, 150, 150)
+            }
 
-                // Неактивный
+            if (image is ImageView) {
+                image.setColorFilter(color)
+            }
 
-                text.setTextColor(
-                    inactiveColor
-                )
-
-                icon.setColorFilter(
-                    inactiveColor
-                )
+            if (text is TextView) {
+                text.setTextColor(color)
             }
         }
     }
