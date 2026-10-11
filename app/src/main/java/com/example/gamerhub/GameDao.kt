@@ -24,4 +24,10 @@ interface GameDao {
 
     @Insert
     suspend fun insertGames(games: List<Game>)
+
+    @Query("UPDATE games SET liked = :liked WHERE id = :gameId")
+    suspend fun updateLiked(
+        gameId: Int,
+        liked: Boolean
+    )
 }

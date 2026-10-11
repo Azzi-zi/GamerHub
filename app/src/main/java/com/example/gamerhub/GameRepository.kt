@@ -15,6 +15,12 @@ class GameRepository(
     suspend fun getGameCount(): Int {
         return gameDao.getGameCount()
     }
+    suspend fun updateLiked(
+        gameId: Int,
+        liked: Boolean
+    ) {
+        gameDao.updateLiked(gameId, liked)
+    }
 
     suspend fun loadInitialGames() {
 
