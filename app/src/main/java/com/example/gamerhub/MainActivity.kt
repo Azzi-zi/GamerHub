@@ -151,12 +151,16 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        navProfile.setOnClickListener {
 
+        navProfile.setOnClickListener {
             openPage(R.layout.screen_profile)
+
+            val profileView = pageContainer.getChildAt(0)
+            ProfileManager(profileView).setup()
 
             setActiveNav(navProfile)
         }
+
     }
 
 

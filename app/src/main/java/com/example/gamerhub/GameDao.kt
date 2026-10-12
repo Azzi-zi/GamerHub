@@ -3,6 +3,7 @@ package com.example.gamerhub
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface GameDao {
@@ -30,4 +31,12 @@ interface GameDao {
         gameId: Int,
         liked: Boolean
     )
+    @Query("SELECT * FROM user_profiles WHERE id = 1")
+    suspend fun getUserProfile(): UserProfile?
+
+    @Insert
+    suspend fun insertUserProfile(profile: UserProfile)
+
+    @Update
+    suspend fun updateUserProfile(profile: UserProfile)
 }
