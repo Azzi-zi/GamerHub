@@ -108,9 +108,19 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:text="@player_one"
+                        android:text=""
                         android:textColor="#9B7AFF"
                         android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/profileEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="email@example.com"
+                        android:textColor="#888892"
+                        android:textSize="12sp" />
+
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -255,6 +265,19 @@
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
+
+            <Button
+                android:id="@+id/logoutButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#302344"
+                android:text="Выйти из аккаунта"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+
+
             <!-- Вкладки -->
 
             <LinearLayout
@@ -293,175 +316,37 @@
 
             <!-- Публикации пользователя -->
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="Мои публикации"
-                android:textColor="#FFFFFF"
-                android:textSize="19sp"
-                android:textStyle="bold" />
 
-            <GridLayout
-                android:id="@+id/profilePostsGrid"
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="180dp"
                 android:layout_marginTop="16dp"
-                android:columnCount="2"
-                android:orientation="horizontal"
-                android:useDefaultMargins="false">
+                android:background="@drawable/bg_search"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-                <!-- Публикация Minecraft -->
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/profilePostsEmpty"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
+                    android:gravity="center"
+                    android:text="📝"
+                    android:textColor="#FFFFFF"
+                    android:textSize="32sp" />
 
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="125dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/mincraft"
-                        android:contentDescription="Minecraft" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Мой мир в Minecraft"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="♥ 124"
-                        android:textColor="#9B7AFF"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Публикация Genshin Impact -->
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/profileEmptyMessage"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="6dp"
-                    android:orientation="vertical">
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:text="У тебя пока нет публикаций"
+                    android:textColor="#AAAAAA"
+                    android:textSize="14sp" />
 
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="125dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/genshin_impact"
-                        android:contentDescription="Genshin Impact" />
+            </LinearLayout>
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Мой отряд в Genshin"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="♥ 86"
-                        android:textColor="#9B7AFF"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Публикация World of Tanks -->
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginTop="22dp"
-                    android:layout_marginEnd="6dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="125dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/world_of_tanks"
-                        android:contentDescription="World of Tanks" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Лучший бой за неделю"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="♥ 52"
-                        android:textColor="#9B7AFF"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-                <!-- Публикация Baldur's Gate 3 -->
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_columnWeight="1"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginTop="22dp"
-                    android:orientation="vertical">
-
-                    <ImageView
-                        android:layout_width="match_parent"
-                        android:layout_height="125dp"
-                        android:background="@drawable/bg_category"
-                        android:clipToOutline="true"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/bal_gate"
-                        android:contentDescription="Baldur's Gate 3" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Прохождение BG3"
-                        android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="♥ 39"
-                        android:textColor="#9B7AFF"
-                        android:textSize="12sp" />
-
-                </LinearLayout>
-
-            </GridLayout>
 
         </LinearLayout>
 

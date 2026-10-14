@@ -1,6 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.ksp)
+
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -55,6 +57,12 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    // Управляет совместимыми версиями библиотек Firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+
+// Библиотека для регистрации и авторизации пользователей
+    implementation("com.google.firebase:firebase-auth")
 
     ksp("androidx.room:room-compiler:2.8.0")
 }

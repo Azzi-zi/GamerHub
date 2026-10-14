@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "33827095839",
+    "project_id": "gamerhub-6b871",
+    "storage_bucket": "gamerhub-6b871.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:33827095839:android:befd28bb8ecb4c3d6c9c2a",
+        "android_client_info": {
+          "package_name": "com.example.gamerhub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDa_dT80KEwvV_UN_iWF27Y-pxOoVObzcU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

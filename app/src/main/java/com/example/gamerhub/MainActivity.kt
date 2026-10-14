@@ -1,5 +1,6 @@
 package com.example.gamerhub
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.text.SpannableString
@@ -12,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 
+import com.google.firebase.auth.FirebaseAuth
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -58,6 +60,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Проверяем, вошёл ли пользователь в аккаунт
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            startActivity(
+                Intent(this, LoginActivity::class.java)
+            )
+            finish()
+            return
+        }
 
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
@@ -156,7 +167,7 @@ class MainActivity : AppCompatActivity() {
             openPage(R.layout.screen_profile)
 
             val profileView = pageContainer.getChildAt(0)
-            ProfileManager(profileView).setup()
+            ProfileManager(profileView, repository).setup()
 
             setActiveNav(navProfile)
         }
@@ -202,6 +213,7 @@ class MainActivity : AppCompatActivity() {
 
         val title = view.findViewById<TextView>(
             R.id.logoText
+
         )
 
         val text = "GamerHub"
@@ -228,7 +240,14 @@ class MainActivity : AppCompatActivity() {
 
 
         title.text = spannable
+
+        title.setOnClickListener {
+            startActivity(
+                Intent(this, RegisterActivity::class.java)
+            )
+        }
     }
+
 
 
     // ============================================================
