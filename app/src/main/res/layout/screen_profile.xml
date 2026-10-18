@@ -172,7 +172,7 @@
                         android:id="@+id/profilePostsCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="12"
+                        android:text="0"
                         android:textColor="#FFFFFF"
                         android:textSize="22sp"
                         android:textStyle="bold" />
@@ -203,7 +203,7 @@
                         android:id="@+id/profileFriendsCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="248"
+                        android:text="0"
                         android:textColor="#FFFFFF"
                         android:textSize="22sp"
                         android:textStyle="bold" />
@@ -234,7 +234,7 @@
                         android:id="@+id/profileLikesCount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="1.5K"
+                        android:text="0"
                         android:textColor="#FFFFFF"
                         android:textSize="22sp"
                         android:textStyle="bold" />

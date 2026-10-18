@@ -110,17 +110,11 @@ class GameRepository(
     suspend fun searchGames(query: String): List<Game> {
         return gameDao.searchGames(query)
     }
-    suspend fun getUserProfile(): UserProfile? {
-        return gameDao.getUserProfile()
+    suspend fun getUserProfile(uid: String): UserProfile? {
+        return gameDao.getUserProfile(uid)
     }
 
     suspend fun saveUserProfile(profile: UserProfile) {
-        val existingProfile = gameDao.getUserProfile()
-
-        if (existingProfile == null) {
-            gameDao.insertUserProfile(profile)
-        } else {
-            gameDao.updateUserProfile(profile)
-        }
+        gameDao.insertUserProfile(profile)
     }
 }

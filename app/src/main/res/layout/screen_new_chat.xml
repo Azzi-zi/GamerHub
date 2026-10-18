@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121216"
+    android:padding="20dp">
+
+    <!-- Заголовок экрана -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Новый чат"
+        android:textColor="#FFFFFF"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"/>
+
+    <!-- Пояснение -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Найди игрока и начни общение"
+        android:textColor="#9999A3"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Поле поиска пользователей -->
+    <EditText
+        android:id="@+id/userSearchInput"
+        android:layout_width="match_parent"
+        android:layout_height="50dp"
+        android:background="@drawable/bg_search"
+        android:hint="Введи имя игрока..."
+        android:textColor="#FFFFFF"
+        android:textColorHint="#777780"
+        android:singleLine="true"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:inputType="text"
+        android:imeOptions="actionSearch"/>
+
+    <!-- Подсказка или результат поиска -->
+    <TextView
+        android:id="@+id/searchUsersStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Начни вводить имя пользователя"
+        android:textColor="#9999A3"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:padding="20dp"/>
+
+    <!-- Список найденных игроков -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/userResultsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+
+    </ScrollView>
+
+</LinearLayout>

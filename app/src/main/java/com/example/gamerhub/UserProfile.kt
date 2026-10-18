@@ -6,8 +6,9 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "user_profiles")
 data class UserProfile(
+    // UID уникален для каждого аккаунта Firebase
     @PrimaryKey
-    val id: Int = 1,
+    val uid: String,
 
     val username: String = "PlayerOne",
     val tag: String = "@player_one",

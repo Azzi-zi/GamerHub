@@ -2,6 +2,7 @@ package com.example.gamerhub
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 
@@ -27,16 +28,13 @@ interface GameDao {
     suspend fun insertGames(games: List<Game>)
 
     @Query("UPDATE games SET liked = :liked WHERE id = :gameId")
-    suspend fun updateLiked(
-        gameId: Int,
-        liked: Boolean
-    )
-    @Query("SELECT * FROM user_profiles WHERE id = 1")
-    suspend fun getUserProfile(): UserProfile?
+    suspend fun updateLiked(gameId: Int, liked: Boolean)
 
-    @Insert
+    // Получаем профиль конкретного аккаунта
+    @Query("SELECT * FROM user_profiles WHERE uid = :uid")
+    suspend fun getUserProfile(uid: String): UserProfile?
+
+    // Сохраняем профиль; если UID уже есть, обновляем его
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUserProfile(profile: UserProfile)
-
-    @Update
-    suspend fun updateUserProfile(profile: UserProfile)
 }

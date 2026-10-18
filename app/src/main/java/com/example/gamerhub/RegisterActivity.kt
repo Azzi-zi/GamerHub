@@ -11,11 +11,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
-
+import com.google.firebase.firestore.FirebaseFirestore
 class RegisterActivity : AppCompatActivity() {
 
     // Объект для работы с Firebase Authentication
     private lateinit var auth: FirebaseAuth
+
+    // Объект для работы с базой данных Firestore
+    private lateinit var db: FirebaseFirestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,6 +52,8 @@ class RegisterActivity : AppCompatActivity() {
         // Получаем доступ к Firebase Authentication
         auth = FirebaseAuth.getInstance()
 
+        db = FirebaseFirestore.getInstance()
+
         // Находим элементы интерфейса по их ID
         val emailInput = findViewById<EditText>(R.id.emailInput)
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
@@ -78,11 +83,57 @@ class RegisterActivity : AppCompatActivity() {
 
                     if (task.isSuccessful) {
 
-                        Toast.makeText(
-                            this,
-                            "Аккаунт успешно создан!",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        // Получаем созданный аккаунт
+                        val user = auth.currentUser
+
+
+                        if (user != null) {
+
+                            // Личные данные пользователя
+                            val profile = hashMapOf(
+                                "uid" to user.uid,
+                                "email" to email,
+                                "username" to email.substringBefore("@"),
+                                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                            )
+
+                            // Публичные данные для поиска игроков
+                            val publicProfile = hashMapOf(
+                                "uid" to user.uid,
+                                "username" to email.substringBefore("@")
+                            )
+
+                            // Готовим запись в две коллекции
+                            val batch = db.batch()
+
+                            batch.set(
+                                db.collection("users").document(user.uid),
+                                profile
+                            )
+
+                            batch.set(
+                                db.collection("publicProfiles").document(user.uid),
+                                publicProfile
+                            )
+
+                            // Сохраняем обе записи
+                            batch.commit()
+                                .addOnSuccessListener {
+                                    Toast.makeText(
+                                        this,
+                                        "Аккаунт создан! Профиль сохранён.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                .addOnFailureListener { error ->
+                                    Toast.makeText(
+                                        this,
+                                        "Ошибка сохранения профиля: ${error.localizedMessage}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                        }
+
 
                     } else {
 

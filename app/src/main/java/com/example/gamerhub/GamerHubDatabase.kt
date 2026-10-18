@@ -9,7 +9,7 @@ import androidx.room.RoomDatabase
         Game::class,
         UserProfile::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class GamerHubDatabase : RoomDatabase() {

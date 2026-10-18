@@ -64,5 +64,8 @@ dependencies {
 // Библиотека для регистрации и авторизации пользователей
     implementation("com.google.firebase:firebase-auth")
 
+    // База данных для сообщений и диалогов
+    implementation("com.google.firebase:firebase-firestore")
+
     ksp("androidx.room:room-compiler:2.8.0")
 }
