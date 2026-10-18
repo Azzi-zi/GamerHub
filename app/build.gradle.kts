@@ -67,5 +67,7 @@ dependencies {
     // База данных для сообщений и диалогов
     implementation("com.google.firebase:firebase-firestore")
 
+// Хранение аватарок пользователей в облаке
+    implementation("com.google.firebase:firebase-storage")
     ksp("androidx.room:room-compiler:2.8.0")
 }

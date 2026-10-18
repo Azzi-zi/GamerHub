@@ -1,6 +1,9 @@
 
 package com.example.gamerhub
 
+
+import android.net.Uri
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import android.content.Intent
@@ -35,6 +38,42 @@ class MainActivity : AppCompatActivity() {
 
     // Менеджер мессенджера
     private lateinit var chatsManager: ChatsManager
+
+
+    //обработчик галереи
+    // Функция, которая получит выбранную фотографию
+    private var avatarPickCallback: ((Uri) -> Unit)? = null
+
+    // Открываем системный выбор изображения
+    private val avatarPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+
+            if (uri != null) {
+                try {
+                    // Разрешаем приложению читать изображение после перезапуска
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+
+                    avatarPickCallback?.invoke(uri)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        this,
+                        "Не удалось открыть фотографию",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } finally {
+                    avatarPickCallback = null
+                }
+            }
+        }
+
+    // Эту функцию будет вызывать ProfileManager
+    fun openAvatarPicker(onPicked: (Uri) -> Unit) {
+        avatarPickCallback = onPicked
+        avatarPicker.launch(arrayOf("image/*"))
+    }
 
     // ============================================================
     // DATABASE
@@ -79,9 +118,19 @@ class MainActivity : AppCompatActivity() {
             GamerHubDatabase::class.java,
             "gamerhub_database"
         )
-            .addMigrations(MIGRATION_4_5)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
             .fallbackToDestructiveMigration()
             .build()
+    }
+    private val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE user_profiles ADD COLUMN roles TEXT NOT NULL DEFAULT 'Геймер'"
+            )
+            db.execSQL(
+                "ALTER TABLE user_profiles ADD COLUMN avatarUri TEXT NOT NULL DEFAULT ''"
+            )
+        }
     }
 
     private val repository by lazy {

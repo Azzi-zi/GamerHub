@@ -560,6 +560,7 @@ class ChatsManager(
             openPage(R.layout.screen_chats)
         }
 
+
         fun sendMessage() {
             val text = input.text.toString().trim()
 
@@ -568,7 +569,8 @@ class ChatsManager(
             val uid = FirebaseAuth.getInstance().currentUser?.uid
             if (uid == null) {
                 Toast.makeText(
-                    activity, "Сначала войди в аккаунт",
+                    activity,
+                    "Сначала войди в аккаунт",
                     Toast.LENGTH_SHORT
                 ).show()
                 return
@@ -580,27 +582,33 @@ class ChatsManager(
             val message = hashMapOf(
                 "senderId" to uid,
                 "text" to text,
-                "createdAt" to FieldValue.serverTimestamp()
+                "createdAt" to FieldValue.serverTimestamp(),
+                "readBy" to listOf(uid)
             )
 
             sendButton.isEnabled = false
 
             messageRef.set(message)
                 .addOnSuccessListener {
-                    // Обновляем превью чата. Список чатов слушает Firestore,
-                    // поэтому последнее сообщение появится там автоматически.
                     chatRef.update(
                         mapOf(
                             "lastMessage" to text,
                             "lastMessageAt" to FieldValue.serverTimestamp()
                         )
-                    )
+                    ).addOnFailureListener { error ->
+                        Toast.makeText(
+                            activity,
+                            "Сообщение отправлено, но превью чата не обновилось: ${error.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
 
                     input.text.clear()
                     sendButton.isEnabled = true
                 }
                 .addOnFailureListener { error ->
                     sendButton.isEnabled = true
+
                     Toast.makeText(
                         activity,
                         "Не удалось отправить сообщение: ${error.message}",
@@ -608,6 +616,7 @@ class ChatsManager(
                     ).show()
                 }
         }
+
 
         sendButton.setOnClickListener { sendMessage() }
 
@@ -643,28 +652,83 @@ class ChatsManager(
 
                 messagesContainer.removeAllViews()
 
+
+                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+
                 snapshot.documents.forEach { document ->
                     val senderId = document.getString("senderId") ?: ""
                     val text = document.getString("text") ?: return@forEach
-                    val isMine =
-                        senderId == FirebaseAuth.getInstance().currentUser?.uid
+                    val isMine = senderId == currentUid
 
+                    // Получаем список пользователей, прочитавших сообщение
+                    val readBy = (document.get("readBy") as? List<*>)
+                        ?.filterIsInstance<String>()
+                        ?: emptyList()
+
+                    // Если это чужое сообщение, отмечаем его прочитанным
+                    if (!isMine && currentUid.isNotEmpty() && currentUid !in readBy) {
+                        document.reference.update(
+                            "readBy",
+                            FieldValue.arrayUnion(currentUid)
+                        )
+                    }
+
+                    // Проверяем, прочитал ли сообщение собеседник
+                    val isReadByRecipient = isMine && readBy.any { it != senderId }
+
+                    // Получаем время сообщения
+                    val timestamp = document.getTimestamp("createdAt")
+                    val timeText = timestamp?.toDate()?.let {
+                        java.text.SimpleDateFormat(
+                            "HH:mm",
+                            java.util.Locale.getDefault()
+                        ).format(it)
+                    } ?: ""
+
+                    // Контейнер сообщения
                     val wrapper = LinearLayout(activity).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = if (isMine) Gravity.END else Gravity.START
                     }
 
-                    val bubble = TextView(activity).apply {
-                        this.text = text
-                        textSize = 15f
-                        setTextColor(Color.WHITE)
-                        setPadding(dp(14), dp(10), dp(14), dp(10))
+                    // Контейнер текста и времени
+                    val bubble = LinearLayout(activity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(14), dp(10), dp(14), dp(8))
+
                         background = roundedBackground(
                             if (isMine) Color.rgb(112, 58, 180)
                             else Color.rgb(40, 40, 48),
                             16
                         )
                     }
+
+                    // Текст сообщения
+                    val messageText = TextView(activity).apply {
+                        this.text = text
+                        textSize = 15f
+                        setTextColor(Color.WHITE)
+                    }
+
+                    // Время и галочки
+                    val metadata = TextView(activity).apply {
+                        val status = if (isMine) {
+                            if (isReadByRecipient) "✓✓" else "✓"
+                        } else {
+                            ""
+                        }
+
+                        this.text = listOf(timeText, status)
+                            .filter { it.isNotEmpty() }
+                            .joinToString("  ")
+
+                        textSize = 11f
+                        setTextColor(Color.rgb(210, 195, 230))
+                        gravity = Gravity.END
+                    }
+
+                    bubble.addView(messageText)
+                    bubble.addView(metadata)
 
                     val bubbleParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -685,6 +749,7 @@ class ChatsManager(
                         )
                     )
                 }
+
 
                 messagesScroll.post {
                     messagesScroll.fullScroll(View.FOCUS_DOWN)

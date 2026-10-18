@@ -55,6 +55,7 @@ class RegisterActivity : AppCompatActivity() {
         db = FirebaseFirestore.getInstance()
 
         // Находим элементы интерфейса по их ID
+        val usernameInput = findViewById<EditText>(R.id.usernameInput)
         val emailInput = findViewById<EditText>(R.id.emailInput)
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
         val registerButton = findViewById<Button>(R.id.registerButton)
@@ -63,17 +64,12 @@ class RegisterActivity : AppCompatActivity() {
         // Обрабатываем нажатие на кнопку регистрации
         registerButton.setOnClickListener {
 
+            val username = usernameInput.text.toString().trim()
             val email = emailInput.text.toString().trim()
             val password = passwordInput.text.toString()
 
-            // Проверяем, заполнены ли поля
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(
-                    this,
-                    "Заполни все поля",
-                    Toast.LENGTH_SHORT
-                ).show()
-
+            if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, "Заполни все поля", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -93,14 +89,13 @@ class RegisterActivity : AppCompatActivity() {
                             val profile = hashMapOf(
                                 "uid" to user.uid,
                                 "email" to email,
-                                "username" to email.substringBefore("@"),
+                                "username" to username,
                                 "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                             )
 
-                            // Публичные данные для поиска игроков
                             val publicProfile = hashMapOf(
                                 "uid" to user.uid,
-                                "username" to email.substringBefore("@")
+                                "username" to username
                             )
 
                             // Готовим запись в две коллекции

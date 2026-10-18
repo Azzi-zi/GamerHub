@@ -44,11 +44,13 @@
                     android:id="@+id/profileSettings"
                     android:layout_width="42dp"
                     android:layout_height="42dp"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:background="@drawable/bg_category"
                     android:contentDescription="Настройки профиля"
                     android:padding="10dp"
                     android:src="@android:drawable/ic_menu_preferences"
-                    android:tint="#AAAAAA" />
+                    app:tint="#AAAAAA" />
 
             </LinearLayout>
 
@@ -62,8 +64,11 @@
                 android:orientation="horizontal">
 
                 <FrameLayout
+                    android:id="@+id/profileAvatarContainer"
                     android:layout_width="100dp"
-                    android:layout_height="100dp">
+                    android:layout_height="100dp"
+                    android:clickable="true"
+                    android:focusable="true">
 
                     <ImageView
                         android:id="@+id/profileAvatar"
@@ -122,18 +127,32 @@
                         android:textSize="12sp" />
 
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_category_active"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:paddingTop="5dp"
-                        android:paddingBottom="5dp"
-                        android:text="🎮 Геймер"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12sp" />
+                        android:fillViewport="false"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/profileRolesContainer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_category_active"
+                                android:paddingHorizontal="10dp"
+                                android:paddingVertical="5dp"
+                                android:text="🎮 Геймер"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp" />
+
+                        </LinearLayout>
+
+                    </HorizontalScrollView>
 
                 </LinearLayout>
 
