@@ -239,34 +239,29 @@ class SearchManager(
                     resultsTitle.visibility = View.VISIBLE
 
 
-                    activity.lifecycleScope.launch(
-                        Dispatchers.IO
-                    ) {
 
-                        val games = repository.searchGames(
-                            query
-                        )
+                    activity.lifecycleScope.launch(Dispatchers.IO) {
+                        val games = getGamesSafely().filter {
+                            it.title.contains(query, ignoreCase = true)
+                        }
 
                         withContext(Dispatchers.Main) {
+                            recyclerView.adapter = GameAdapter(
+                                games,
+                                repository,
+                                activity
+                            ) { game ->
+                                onGameClick(game)
+                            }
 
-                            recyclerView.adapter =
-                                GameAdapter(
-                                    games,
-                                    repository,
-                                    activity
-                                ) { game ->
-                                    onGameClick(game)
-                                }
-
-
-                            resultsTitle.text =
-                                if (games.isEmpty()) {
-                                    "Ничего не найдено"
-                                } else {
-                                    "Найдено: ${games.size}"
-                                }
+                            resultsTitle.text = if (games.isEmpty()) {
+                                "Ничего не найдено"
+                            } else {
+                                "Найдено: ${games.size}"
+                            }
                         }
                     }
+
                 }
 
 
@@ -328,71 +323,65 @@ class SearchManager(
     // LOAD SEARCH GAMES
     // ============================================================
 
+
     private fun loadSearchGames(
         recyclerView: RecyclerView,
         resultsTitle: TextView
     ) {
-
-        activity.lifecycleScope.launch(
-            Dispatchers.IO
-        ) {
-
-            repository.loadInitialGames()
-
-            val games = repository.getGames()
+        activity.lifecycleScope.launch(Dispatchers.IO) {
+            val games = getGamesSafely()
 
             withContext(Dispatchers.Main) {
-
-                recyclerView.adapter =
-                    GameAdapter(
-                        games,
-                        repository,
-                        activity
-                    ) { game ->
-                        onGameClick(game)
-                    }
+                recyclerView.adapter = GameAdapter(
+                    games,
+                    repository,
+                    activity
+                ) { game ->
+                    onGameClick(game)
+                }
 
                 resultsTitle.visibility = View.GONE
+
+                if (games.isEmpty()) {
+                    android.util.Log.w(
+                        "GamerHubSearch",
+                        "Каталог пуст: игры не найдены ни в Firebase, ни в Room"
+                    )
+                }
             }
         }
     }
+
 
 
     // ============================================================
     // FILTER GAMES
     // ============================================================
 
+
+
     private fun filterGames(
         recyclerView: RecyclerView,
         category: String
     ) {
-
-        activity.lifecycleScope.launch(
-            Dispatchers.IO
-        ) {
-
-            val games = repository
-                .getGames()
-                .filter {
-                    it.genre.contains(
-                        category,
-                        ignoreCase = true
-                    )
-                }
+        activity.lifecycleScope.launch(Dispatchers.IO) {
+            val games = getGamesSafely().filter {
+                it.genre.contains(category, ignoreCase = true)
+            }
 
             withContext(Dispatchers.Main) {
-
-                recyclerView.adapter =
-                    GameAdapter(
-                        games,
-                        repository,
-                        activity
-                    ) { game ->
-                        onGameClick(game)
-                    }
+                recyclerView.adapter = GameAdapter(
+                    games,
+                    repository,
+                    activity
+                ) { game ->
+                    onGameClick(game)
+                }
             }
         }
     }
+
+
 
 
     // ============================================================
@@ -454,4 +443,30 @@ class SearchManager(
             R.drawable.bg_category_active
         )
     }
+
+    private suspend fun getGamesSafely(): List<Game> {
+        return try {
+            // Основной источник — Firebase
+            repository.getGames()
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "GamerHubSearch",
+                "Ошибка загрузки каталога из Firebase",
+                e
+            )
+
+            // Если Firebase недоступен — пробуем локальную базу
+            try {
+                repository.getLocalGames()
+            } catch (localError: Exception) {
+                android.util.Log.e(
+                    "GamerHubSearch",
+                    "Ошибка загрузки каталога из Room",
+                    localError
+                )
+                emptyList()
+            }
+        }
+    }
+
 }

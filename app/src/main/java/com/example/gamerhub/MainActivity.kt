@@ -1,7 +1,7 @@
 
 package com.example.gamerhub
 
-
+import android.widget.Toast
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.room.migration.Migration
@@ -304,17 +304,51 @@ class MainActivity : AppCompatActivity() {
     // LOAD GAMES
     // ============================================================
 
+
+
     private fun loadGames() {
         lifecycleScope.launch(Dispatchers.IO) {
-            repository.loadInitialGames()
+            try {
+                // Загружаем готовый каталог из Firebase
+                val games = repository.getGames()
 
-            val games = repository.getGames()
+                withContext(Dispatchers.Main) {
+                    showHomeGames(games)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "GamerHub",
+                    "Ошибка загрузки каталога из Firebase",
+                    e
+                )
 
-            withContext(Dispatchers.Main) {
-                showHomeGames(games)
+                val localGames = try {
+                    repository.getLocalGames()
+                } catch (localError: Exception) {
+                    android.util.Log.e(
+                        "GamerHub",
+                        "Ошибка загрузки каталога из Room",
+                        localError
+                    )
+                    emptyList()
+                }
+
+                withContext(Dispatchers.Main) {
+                    showHomeGames(localGames)
+
+                    if (localGames.isEmpty()) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Не удалось загрузить каталог игр",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
         }
     }
+
+
 
     // ============================================================
     // HOME GAMES

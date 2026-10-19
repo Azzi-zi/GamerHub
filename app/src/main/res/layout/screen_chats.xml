@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121216">
+    android:background="#101016">
 
     <ScrollView
         android:layout_width="0dp"
@@ -13,8 +13,8 @@
         android:clipToPadding="false"
         android:paddingStart="20dp"
         android:paddingEnd="20dp"
-        android:paddingTop="24dp"
-        android:paddingBottom="20dp"
+        android:paddingTop="26dp"
+        android:paddingBottom="24dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -25,7 +25,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Заголовок и кнопка создания чата -->
+            <!-- Шапка -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -41,53 +41,64 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Сообщения"
+                        android:text="СООБЩЕНИЯ"
+                        android:textColor="#A970FF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.16" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:text="Твои игроки"
                         android:textColor="#FFFFFF"
-                        android:textSize="27sp"
+                        android:textSize="28sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:text="Общайся с игроками"
-                        android:textColor="#888891"
-                        android:textSize="14sp" />
+                        android:text="Общайся с командой и друзьями"
+                        android:textColor="#92929F"
+                        android:textSize="13sp" />
 
                 </LinearLayout>
 
                 <TextView
                     android:id="@+id/newChatButton"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
                     android:background="@drawable/bg_create_button"
                     android:gravity="center"
                     android:text="+"
                     android:textColor="#FFFFFF"
-                    android:textSize="29sp"
+                    android:textSize="30sp"
                     android:contentDescription="Создать чат"
                     android:clickable="true"
-                    android:focusable="true" />
+                    android:focusable="true"
+                    android:elevation="4dp" />
 
             </LinearLayout>
 
             <!-- Поиск игроков -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="24dp"
+                android:layout_height="52dp"
+                android:layout_marginTop="25dp"
                 android:background="@drawable/bg_search"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="14dp"
+                android:paddingStart="16dp"
                 android:paddingEnd="14dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="⌕"
-                    android:textColor="#A970FF"
-                    android:textSize="27sp" />
+                    android:textColor="#B784FF"
+                    android:textSize="29sp" />
 
                 <EditText
                     android:id="@+id/chatSearch"
@@ -95,13 +106,13 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@android:color/transparent"
-                    android:hint="Поиск игроков..."
+                    android:hint="Найти игрока..."
                     android:inputType="text"
                     android:singleLine="true"
-                    android:paddingStart="10dp"
+                    android:paddingStart="12dp"
                     android:paddingEnd="4dp"
                     android:textColor="#FFFFFF"
-                    android:textColorHint="#777780"
+                    android:textColorHint="#777783"
                     android:textSize="14sp"
                     android:imeOptions="actionSearch" />
 
@@ -116,36 +127,74 @@
                 android:orientation="vertical"
                 android:visibility="gone" />
 
-            <!-- Заголовок списка переписок -->
-            <TextView
+            <!-- Раздел переписок -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
-                android:text="Все сообщения"
-                android:textColor="#FFFFFF"
-                android:textSize="17sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="30dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <!-- Отображается, если чатов ещё нет -->
+                <View
+                    android:layout_width="4dp"
+                    android:layout_height="20dp"
+                    android:background="#A970FF" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:text="ТВОИ ПЕРЕПИСКИ"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.07" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GAMERHUB"
+                    android:textColor="#777080"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08" />
+
+            </LinearLayout>
+
+            <!-- Состояние списка: загрузка или пустой список -->
             <TextView
                 android:id="@+id/chatsEmptyText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="18dp"
+                android:background="#191820"
                 android:gravity="center"
-                android:padding="20dp"
+                android:padding="24dp"
                 android:text="У тебя пока нет чатов.\nНажми +, чтобы найти игрока."
-                android:textColor="#92929D"
+                android:textColor="#AAA7B6"
                 android:textSize="14sp"
+                android:lineSpacingExtra="5dp"
                 android:visibility="visible" />
 
-            <!-- Здесь ChatsManager создаёт карточки реальных чатов -->
+            <!-- ChatsManager добавляет реальные переписки сюда -->
             <LinearLayout
                 android:id="@+id/chatsListContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:orientation="vertical" />
+
+            <!-- Нижняя подпись -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:gravity="center"
+                android:text="GG  •  GOOD GAME, GOOD COMPANY"
+                android:textColor="#55515F"
+                android:textSize="10sp"
+                android:letterSpacing="0.08" />
 
         </LinearLayout>
 

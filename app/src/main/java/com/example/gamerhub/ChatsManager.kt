@@ -1,6 +1,7 @@
 
 package com.example.gamerhub
 
+
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -271,6 +272,9 @@ class ChatsManager(
     // Создание чата или открытие уже существующего
     // ---------------------------------------------------------
 
+
+
+
     private fun createPrivateChat(
         otherUid: String,
         otherUsername: String
@@ -279,7 +283,8 @@ class ChatsManager(
 
         if (currentUser == null) {
             Toast.makeText(
-                activity, "Сначала войди в аккаунт",
+                activity,
+                "Сначала войди в аккаунт",
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -287,51 +292,72 @@ class ChatsManager(
 
         if (currentUser.uid == otherUid) {
             Toast.makeText(
-                activity, "Нельзя создать чат с собой",
+                activity,
+                "Нельзя создать чат с самим собой",
                 Toast.LENGTH_SHORT
             ).show()
             return
         }
 
-        val participants = listOf(currentUser.uid, otherUid).sorted()
-        val chatId = "${participants[0]}_${participants[1]}"
-        val chatRef = db.collection("chats").document(chatId)
+        // Сначала загружаем чаты текущего пользователя.
+        // Так мы найдём существующий чат независимо от порядка UID в его ID.
+        db.collection("chats")
+            .whereArrayContains("participants", currentUser.uid)
+            .get()
+            .addOnSuccessListener { snapshot ->
 
-        chatRef.get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    openPrivateChat(chatId, otherUsername)
-                    return@addOnSuccessListener
+                val existingChat = snapshot.documents.firstOrNull { document ->
+                    val participants =
+                        document.get("participants") as? List<*>
+
+                    participants?.contains(otherUid) == true
                 }
 
-                val chatData = hashMapOf(
-                    "chatId" to chatId,
-                    "participants" to participants,
-                    "createdAt" to FieldValue.serverTimestamp(),
-                    "lastMessage" to "",
-                    "lastMessageAt" to FieldValue.serverTimestamp()
-                )
+                if (existingChat != null) {
+                    // Чат уже существует — открываем его, не перезаписывая данные.
+                    openPrivateChat(existingChat.id, otherUsername)
+                } else {
+                    // Чат не найден — создаём новый с единообразным ID.
+                    val participants =
+                        listOf(currentUser.uid, otherUid).sorted()
 
-                chatRef.set(chatData)
-                    .addOnSuccessListener {
-                        openPrivateChat(chatId, otherUsername)
-                    }
-                    .addOnFailureListener { error ->
-                        Toast.makeText(
-                            activity,
-                            "Не удалось создать чат: ${error.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                    val chatId =
+                        "${participants[0]}_${participants[1]}"
+
+                    val chatData = hashMapOf(
+                        "chatId" to chatId,
+                        "participants" to participants,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "lastMessage" to "",
+                        "lastMessageAt" to FieldValue.serverTimestamp()
+                    )
+
+                    db.collection("chats")
+                        .document(chatId)
+                        .set(chatData)
+                        .addOnSuccessListener {
+                            openPrivateChat(chatId, otherUsername)
+                        }
+                        .addOnFailureListener { error ->
+                            Toast.makeText(
+                                activity,
+                                "Не удалось создать чат: ${error.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                }
             }
             .addOnFailureListener { error ->
                 Toast.makeText(
                     activity,
-                    "Ошибка открытия чата: ${error.message}",
+                    "Не удалось загрузить чаты: ${error.message}",
                     Toast.LENGTH_LONG
                 ).show()
             }
     }
+
+
+
 
     private fun openPrivateChat(chatId: String, username: String) {
         currentChatId = chatId
@@ -343,29 +369,72 @@ class ChatsManager(
     // Загрузка реального списка переписок из Firestore
     // ---------------------------------------------------------
 
+
     private fun setupChatList(view: View) {
         val container =
             view.findViewById<LinearLayout>(R.id.chatsListContainer)
         val emptyText =
             view.findViewById<TextView>(R.id.chatsEmptyText)
 
-        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        // Убираем предыдущий listener, чтобы не создавать дубликаты
+        chatListener?.remove()
+        chatListener = null
+
+        val user = FirebaseAuth.getInstance().currentUser
+        val uid = user?.uid
+
+        android.util.Log.d("GamerHubChats", "UID: $uid")
+        android.util.Log.d(
+            "GamerHubChats",
+            "Project: ${com.google.firebase.FirebaseApp.getInstance().options.projectId}"
+        )
 
         if (uid == null) {
             emptyText.text = "Войди в аккаунт, чтобы увидеть чаты"
+            emptyText.visibility = View.VISIBLE
             return
         }
+
+        emptyText.text = "Загружаем чаты..."
+        emptyText.visibility = View.VISIBLE
 
         chatListener = db.collection("chats")
             .whereArrayContains("participants", uid)
             .addSnapshotListener { snapshot, error ->
+
+                android.util.Log.d(
+                    "GamerHubChats",
+                    "Из кэша: ${snapshot?.metadata?.isFromCache}, " +
+                            "количество: ${snapshot?.size()}"
+                )
+
                 if (error != null) {
+                    android.util.Log.e(
+                        "GamerHubChats",
+                        "Ошибка списка чатов: code=${error.code}, message=${error.message}",
+                        error
+                    )
+
+                    emptyText.text =
+                        "Ошибка Firestore: ${error.code}\n${error.message}"
                     emptyText.visibility = View.VISIBLE
-                    emptyText.text = "Не удалось загрузить чаты"
                     return@addSnapshotListener
                 }
 
-                if (snapshot == null) return@addSnapshotListener
+                if (snapshot == null) {
+                    android.util.Log.w(
+                        "GamerHubChats",
+                        "Snapshot равен null, ошибки нет"
+                    )
+                    emptyText.text = "Ожидание данных чатов..."
+                    emptyText.visibility = View.VISIBLE
+                    return@addSnapshotListener
+                }
+
+                android.util.Log.d(
+                    "GamerHubChats",
+                    "Список получен: ${snapshot.size()} документов"
+                )
 
                 val documents = snapshot.documents.sortedByDescending {
                     it.getTimestamp("lastMessageAt")?.toDate()?.time ?: 0L
@@ -374,16 +443,14 @@ class ChatsManager(
                 container.removeAllViews()
 
                 if (documents.isEmpty()) {
-                    emptyText.visibility = View.VISIBLE
                     emptyText.text =
                         "У тебя пока нет чатов.\nНажми +, чтобы найти игрока."
+                    emptyText.visibility = View.VISIBLE
                     return@addSnapshotListener
                 }
 
                 emptyText.visibility = View.GONE
 
-                // Получаем имена собеседников. После загрузки всех профилей
-                // отображаем карточки в порядке последнего сообщения.
                 val rows = arrayOfNulls<ChatRowData>(documents.size)
                 var remaining = documents.size
 
@@ -396,8 +463,15 @@ class ChatsManager(
                         ?.firstOrNull { it != uid }
 
                     if (otherUid == null) {
+                        android.util.Log.w(
+                            "GamerHubChats",
+                            "У чата ${document.id} не найден второй участник"
+                        )
+
                         remaining--
-                        if (remaining == 0) renderChatRows(container, rows)
+                        if (remaining == 0) {
+                            renderChatRows(container, rows)
+                        }
                         return@forEachIndexed
                     }
 
@@ -407,8 +481,7 @@ class ChatsManager(
                         .addOnSuccessListener { profile ->
                             rows[index] = ChatRowData(
                                 chatId = document.id,
-                                username = profile.getString("username")
-                                    ?: "Игрок",
+                                username = profile.getString("username") ?: "Игрок",
                                 lastMessage = document.getString("lastMessage")
                                     ?: "Начните общение!",
                                 lastMessageAt =
@@ -420,7 +493,13 @@ class ChatsManager(
                                 renderChatRows(container, rows)
                             }
                         }
-                        .addOnFailureListener {
+                        .addOnFailureListener { profileError ->
+                            android.util.Log.e(
+                                "GamerHubChats",
+                                "Не удалось загрузить профиль $otherUid: ${profileError.message}",
+                                profileError
+                            )
+
                             rows[index] = ChatRowData(
                                 chatId = document.id,
                                 username = "Игрок",

@@ -68,17 +68,50 @@ class ProfileManager(
     }
 
     // Загружаем профиль текущего пользователя
+
     private fun loadProfile() {
         val activity = view.context as MainActivity
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val user = FirebaseAuth.getInstance().currentUser ?: return
+        val uid = user.uid
 
         activity.lifecycleScope.launch {
             try {
                 val profile = withContext(Dispatchers.IO) {
-                    repository.getUserProfile(uid)
-                        ?: UserProfile(uid = uid).also { newProfile ->
-                            repository.saveUserProfile(newProfile)
-                        }
+                    // Сначала ищем уже существующий локальный профиль.
+                    val localProfile = repository.getUserProfile(uid)
+
+                    if (localProfile != null) {
+                        localProfile
+                    } else {
+                        // Если его нет, берём имя из регистрации в Firestore.
+                        val document = Tasks.await(
+                            FirebaseFirestore.getInstance()
+                                .collection("users")
+                                .document(uid)
+                                .get()
+                        )
+
+                        val username = document.getString("username")
+                            ?: throw IllegalStateException(
+                                "Имя пользователя не найдено в базе"
+                            )
+
+                        val tag = document.getString("tag")
+                            ?: "@${username.lowercase().replace(" ", "_")}"
+
+                        // Создаём локальный профиль на основе данных регистрации.
+                        val newProfile = UserProfile(
+                            uid = uid,
+                            username = username,
+                            tag = tag,
+                            bio = document.getString("bio") ?: "",
+                            roles = document.getString("roles") ?: "",
+                            avatarUri = document.getString("avatarUri") ?: ""
+                        )
+
+                        repository.saveUserProfile(newProfile)
+                        newProfile
+                    }
                 }
 
                 view.findViewById<TextView>(R.id.profileUsername).text =
@@ -89,30 +122,30 @@ class ProfileManager(
 
                 view.findViewById<TextView>(R.id.profileBio).text =
                     profile.bio
+
                 renderRoles(profile.roles)
 
-                // Восстанавливаем сохранённую фотографию
-                val avatarView = view.findViewById<ImageView>(
-                    R.id.profileAvatar
-                )
+                val avatarView =
+                    view.findViewById<ImageView>(R.id.profileAvatar)
 
                 if (profile.avatarUri.isNotBlank()) {
                     try {
                         avatarView.setImageURI(Uri.parse(profile.avatarUri))
-                    } catch (e: Exception) {
-                        // Если фотография недоступна, оставляем стандартный аватар
+                    } catch (_: Exception) {
+                        // Оставляем стандартный аватар.
                     }
                 }
 
             } catch (e: Exception) {
                 Toast.makeText(
                     view.context,
-                    "Не удалось загрузить профиль",
-                    Toast.LENGTH_SHORT
+                    "Не удалось загрузить профиль: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
                 ).show()
             }
         }
     }
+
 
     private fun saveAvatar(uri: Uri) {
         val activity = view.context as MainActivity

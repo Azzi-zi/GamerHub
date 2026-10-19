@@ -68,26 +68,29 @@ class GameAdapter(
         // Показываем сохранённое состояние лайка
         holder.likes.text = if (game.liked) "❤️ 1" else "🤍 0"
 
-        holder.likes.setOnClickListener {
-            val newLikedState = !game.liked
 
-            // Сразу обновляем интерфейс
+        holder.likes.setOnClickListener {
+            val previousLikedState = game.liked
+            val newLikedState = !previousLikedState
+
+            // Сразу показываем новое состояние сердечка
             game.liked = newLikedState
             holder.likes.text = if (newLikedState) "❤️ 1" else "🤍 0"
 
-            // Сохраняем состояние в Room
             lifecycleOwner.lifecycleScope.launch {
                 try {
-                    withContext(Dispatchers.IO) {
-                        repository.updateLiked(game.id, newLikedState)
-                    }
+                    // Сохраняем лайк в документе игры в Firebase
+                    repository.updateLiked(game.firestoreId, newLikedState)
+
                 } catch (e: Exception) {
                     // Если сохранение не удалось, возвращаем прежнее состояние
-                    game.liked = !newLikedState
-                    holder.likes.text = if (game.liked) "❤️ 1" else "🤍 0"
+                    game.liked = previousLikedState
+                    holder.likes.text =
+                        if (previousLikedState) "❤️ 1" else "🤍 0"
                 }
             }
         }
+
 
         holder.itemView.setOnClickListener {
             onGameClick(game)
