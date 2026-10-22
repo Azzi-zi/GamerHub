@@ -79,6 +79,8 @@ class ChatsManager(
     // Поиск пользователей для создания личного чата
     // ---------------------------------------------------------
 
+
+
     private fun setupUserSearch(view: View) {
         val searchInput =
             view.findViewById<EditText>(R.id.userSearchInput)
@@ -99,28 +101,58 @@ class ChatsManager(
             ) {}
 
             override fun afterTextChanged(s: Editable?) {
-                val query = s.toString().trim()
+                // Оставляем исходный запрос для отображения и
+                // нормализуем его отдельно для поиска.
+                val rawQuery = s?.toString()?.trim().orEmpty()
+                val query = rawQuery
+                    .removePrefix("@")
+                    .trim()
+                    .lowercase(Locale.ROOT)
+
                 resultsContainer.removeAllViews()
 
                 if (query.isEmpty()) {
-                    statusText.text = "Введи имя пользователя"
+                    statusText.text = "Введи имя или тег игрока"
                     return
                 }
 
                 statusText.text = "Ищем пользователей..."
 
                 db.collection("publicProfiles")
-                    .orderBy("username")
-                    .startAt(query)
-                    .endAt(query + "\uf8ff")
-                    .limit(20)
                     .get()
                     .addOnSuccessListener { snapshot ->
-                        resultsContainer.removeAllViews()
+                        val users = snapshot.documents.filter { document ->
+                            val uid = document.getString("uid") ?: document.id
+                            val username =
+                                document.getString("username").orEmpty()
+                            val tag = (
+                                    document.getString("tag")
+                                        ?: document.getString("usernameTag")
+                                        ?: ""
+                                    ).trim()
 
-                        val users = snapshot.documents.filter {
-                            it.getString("uid") != currentUid
-                        }
+                            // Убираем @ только при сравнении.
+                            val normalizedTag = tag
+                                .trim()
+                                .removePrefix("@")
+                                .lowercase(Locale.ROOT)
+
+                            android.util.Log.d(
+                                "GamerHubSearch",
+                                "username='$username', tag='$tag', query='$rawQuery'"
+                            )
+
+                            uid != currentUid &&
+                                    (
+                                            username.contains(
+                                                query,
+                                                ignoreCase = true
+                                            ) ||
+                                                    normalizedTag.contains(query)
+                                            )
+                        }.take(30)
+
+                        resultsContainer.removeAllViews()
 
                         if (users.isEmpty()) {
                             statusText.text = "Пользователи не найдены"
@@ -130,20 +162,34 @@ class ChatsManager(
                         statusText.text = "Найдено: ${users.size}"
 
                         users.forEach { document ->
-                            val uid = document.getString("uid")
-                                ?: document.id
+                            val uid =
+                                document.getString("uid") ?: document.id
                             val username =
                                 document.getString("username") ?: "Игрок"
+                            val tag = (
+                                    document.getString("tag")
+                                        ?: document.getString("usernameTag")
+                                        ?: ""
+                                    ).trim()
 
                             val item = TextView(activity).apply {
-                                text = "🎮  $username"
+                                text = if (tag.isNotBlank()) {
+                                    "🎮  $username\n     $tag"
+                                } else {
+                                    "🎮  $username"
+                                }
+
                                 textSize = 16f
                                 setTextColor(Color.WHITE)
-                                setPadding(16, 18, 16, 18)
+                                setPadding(
+                                    dp(16), dp(14), dp(16), dp(14)
+                                )
                                 gravity = Gravity.CENTER_VERTICAL
                                 background = roundedBackground(
                                     Color.rgb(26, 26, 32), 14
                                 )
+                                isClickable = true
+                                isFocusable = true
                             }
 
                             val params = LinearLayout.LayoutParams(
@@ -162,9 +208,11 @@ class ChatsManager(
                     }
                     .addOnFailureListener { error ->
                         statusText.text = "Ошибка поиска пользователей"
+
                         Toast.makeText(
                             activity,
-                            error.message ?: "Не удалось выполнить поиск",
+                            error.message
+                                ?: "Не удалось выполнить поиск",
                             Toast.LENGTH_LONG
                         ).show()
                     }
