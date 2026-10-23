@@ -4,6 +4,7 @@ package com.example.gamerhub
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.view.Gravity
 import android.view.View
@@ -13,6 +14,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -38,55 +40,58 @@ class CreatePostManager(
 
     private val db = FirebaseFirestore.getInstance()
 
-    private fun setupPostTypeSpinner(view: View) {
-        val spinner = view.findViewById<Spinner>(R.id.postTypeSpinner)
+    private val selectedGameTags = linkedSetOf<String>()
+    private val selectedTopicTags = linkedSetOf<String>()
 
-        val postTypes = listOf(
-            "Выбери тип",
-            "Игры",
-            "Гайды",
-            "Новости",
-            "Лор"
+    private var availableGameTags = listOf<String>()
+    private var availableTopicTags = listOf<String>()
+
+    private val gameTagOptions = mapOf(
+        "minecraft" to listOf(
+            "Песочница",
+            "Выживание",
+            "Крафт",
+            "Строительство",
+            "Открытый мир",
+            "Моды"
+        ),
+        "world of tanks" to listOf(
+            "Танки",
+            "Тактика",
+            "Командная игра",
+            "Сражения",
+            "Техника",
+            "Стратегия"
         )
+    )
 
-        val adapter = object : ArrayAdapter<String>(
-            activity,
-            android.R.layout.simple_spinner_item,
-            postTypes
-        ) {
-            override fun getView(
-                position: Int,
-                convertView: View?,
-                parent: ViewGroup
-            ): View {
-                val textView = super.getView(position, convertView, parent) as TextView
-                textView.setTextColor(Color.WHITE)
-                textView.textSize = 15f
-                return textView
-            }
-
-            override fun getDropDownView(
-                position: Int,
-                convertView: View?,
-                parent: ViewGroup
-            ): View {
-                val textView = super.getDropDownView(position, convertView, parent) as TextView
-                textView.setTextColor(Color.WHITE)
-                textView.setBackgroundColor(Color.parseColor("#201F2D"))
-                textView.textSize = 15f
-                textView.setPadding(24, 24, 24, 24)
-                return textView
-            }
-        }
-
-        adapter.setDropDownViewResource(
-            android.R.layout.simple_spinner_dropdown_item
+    private val topicTagOptions = mapOf(
+        "Игры" to listOf(
+            "Геймплей",
+            "Первый взгляд",
+            "Впечатления"
+        ),
+        "Гайды" to listOf(
+            "Советы",
+            "Для новичков",
+            "Продвинутый уровень",
+            "Обучение"
+        ),
+        "Новости" to listOf(
+            "Обновление",
+            "Анонс",
+            "Событие",
+            "Разработка"
+        ),
+        "Лор" to listOf(
+            "История мира",
+            "Персонажи",
+            "Теории",
+            "Сюжет"
         )
+    )
 
-        spinner.adapter = adapter
-        spinner.setSelection(0)
-    }
-    // Выбор изображения
+    // Выбор изображения из галереи
     private val imagePicker =
         activity.registerForActivityResult(
             ActivityResultContracts.OpenDocument()
@@ -98,7 +103,7 @@ class CreatePostManager(
                         Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                 } catch (_: Exception) {
-                    // Разрешение может быть уже доступно.
+                    // Разрешение могло быть предоставлено ранее.
                 }
 
                 selectedImageUri = uri
@@ -124,9 +129,11 @@ class CreatePostManager(
         ).setOnClickListener {
             publishPost()
         }
+
+        updateTagsHint(view)
     }
 
-    // Загружаем игры из того же каталога, что и на главной странице
+    // Загрузка списка игр
     private fun setupGameSpinner(view: View) {
         val spinner = view.findViewById<Spinner>(
             R.id.postGameSpinner
@@ -211,6 +218,26 @@ class CreatePostManager(
                     ColorDrawable(Color.rgb(30, 30, 38))
                 )
 
+                spinner.onItemSelectedListener =
+                    object : android.widget.AdapterView.OnItemSelectedListener {
+                        override fun onItemSelected(
+                            parent: android.widget.AdapterView<*>?,
+                            itemView: View?,
+                            position: Int,
+                            id: Long
+                        ) {
+                            refreshTags()
+                        }
+
+                        override fun onNothingSelected(
+                            parent: android.widget.AdapterView<*>?
+                        ) {
+                            refreshTags()
+                        }
+                    }
+
+                refreshTags()
+
             } catch (e: Exception) {
                 android.util.Log.e(
                     "CreatePostManager",
@@ -222,13 +249,323 @@ class CreatePostManager(
         }
     }
 
-    // Показываем выбранное изображение
+    // Настройка списка типов публикаций
+    private fun setupPostTypeSpinner(view: View) {
+        val spinner = view.findViewById<Spinner>(
+            R.id.postTypeSpinner
+        )
+
+        val postTypes = listOf(
+            "Выбери тип",
+            "Игры",
+            "Гайды",
+            "Новости",
+            "Лор"
+        )
+
+        val adapter = object : ArrayAdapter<String>(
+            activity,
+            android.R.layout.simple_spinner_item,
+            postTypes
+        ) {
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val textView = super.getView(
+                    position,
+                    convertView,
+                    parent
+                ) as TextView
+
+                textView.setTextColor(Color.WHITE)
+                textView.textSize = 15f
+                return textView
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val textView = super.getDropDownView(
+                    position,
+                    convertView,
+                    parent
+                ) as TextView
+
+                textView.setTextColor(Color.WHITE)
+                textView.setBackgroundColor(
+                    Color.parseColor("#201F2D")
+                )
+                textView.textSize = 15f
+                textView.setPadding(24, 24, 24, 24)
+
+                return textView
+            }
+        }
+
+        adapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        spinner.adapter = adapter
+        spinner.setSelection(0)
+
+        spinner.onItemSelectedListener =
+            object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(
+                    parent: android.widget.AdapterView<*>?,
+                    itemView: View?,
+                    position: Int,
+                    id: Long
+                ) {
+                    refreshTags()
+                }
+
+                override fun onNothingSelected(
+                    parent: android.widget.AdapterView<*>?
+                ) {
+                    refreshTags()
+                }
+            }
+    }
+
+    // Обновляем доступные теги при выборе игры или типа публикации
+    private fun refreshTags() {
+        val view = currentView ?: return
+
+        val selectedGame = view.findViewById<Spinner>(
+            R.id.postGameSpinner
+        ).selectedItem?.toString().orEmpty()
+
+        val selectedType = view.findViewById<Spinner>(
+            R.id.postTypeSpinner
+        ).selectedItem?.toString().orEmpty()
+
+        val normalizedGame = selectedGame.lowercase()
+
+        availableGameTags = gameTagOptions.entries
+            .firstOrNull { normalizedGame.contains(it.key) }
+            ?.value
+            ?: listOf(
+                "Геймплей",
+                "Советы",
+                "Обсуждение",
+                "Впечатления"
+            )
+
+        availableTopicTags = topicTagOptions[selectedType]
+            ?: emptyList()
+
+        // Убираем выбранные теги, которых больше нет в списке
+        selectedGameTags.retainAll(availableGameTags.toSet())
+        selectedTopicTags.retainAll(availableTopicTags.toSet())
+
+        renderTags()
+        updateTagsHint(view)
+    }
+
+    // Рисуем группы тегов
+    private fun renderTags() {
+        val view = currentView ?: return
+
+        val container = view.findViewById<LinearLayout>(
+            R.id.postTagsContainer
+        )
+
+        container.removeAllViews()
+
+        addTagSection(
+            container,
+            "Теги игры",
+            availableGameTags,
+            selectedGameTags
+        )
+
+        addTagSection(
+            container,
+            "Теги публикации",
+            availableTopicTags,
+            selectedTopicTags
+        )
+    }
+
+
+    private fun addTagSection(
+        container: LinearLayout,
+        sectionTitle: String,
+        tags: List<String>,
+        selectedTags: MutableSet<String>
+    ) {
+        if (tags.isEmpty()) return
+
+        val title = TextView(activity).apply {
+            text = sectionTitle
+            textSize = 14f
+            setTextColor(Color.parseColor("#B9B4C9"))
+            setPadding(0, 12, 0, 8)
+        }
+
+        container.addView(title)
+
+        // Контейнер для строк тегов.
+        val tagsLayout = android.widget.LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        container.addView(tagsLayout)
+
+        // Каждая строка будет содержать несколько тегов.
+        var currentRow = createTagRow()
+        tagsLayout.addView(currentRow)
+
+        val availableWidth = activity.resources.displayMetrics.widthPixels -
+                (40 * activity.resources.displayMetrics.density).toInt()
+
+        var usedWidth = 0
+
+        tags.forEach { tag ->
+            val chip = createTagChip(
+                tag,
+                selectedTags.contains(tag)
+            )
+
+            chip.setOnClickListener {
+                if (selectedTags.contains(tag)) {
+                    selectedTags.remove(tag)
+                } else {
+                    selectedTags.add(tag)
+                }
+
+                renderTags()
+                updateTagsHint(currentView)
+            }
+
+            // Измеряем реальную ширину тега.
+            val density = activity.resources.displayMetrics.density
+            val chipWidth = (
+                    tag.length * 8.5f +
+                            if (selectedTags.contains(tag)) 48f else 36f
+                    ) * density
+
+            val margin = (8 * density).toInt()
+            val totalWidth = chipWidth.toInt() + margin
+
+            // Если тег не помещается, создаём новую строку.
+            if (
+                usedWidth > 0 &&
+                usedWidth + totalWidth > availableWidth
+            ) {
+                currentRow = createTagRow()
+                tagsLayout.addView(currentRow)
+                usedWidth = 0
+            }
+
+            currentRow.addView(chip)
+            usedWidth += totalWidth
+        }
+    }
+
+    private fun createTagRow(): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.START
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+    }
+
+    private fun currentRowTagWidth(row: LinearLayout): Int {
+        var width = 0
+
+        for (i in 0 until row.childCount) {
+            width += row.getChildAt(i).measuredWidth
+        }
+
+        return width
+    }
+
+    // Создаём нажимаемый тег
+    private fun createTagChip(
+        tag: String,
+        isSelected: Boolean
+    ): TextView {
+        val background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 40f
+            setColor(
+                if (isSelected) {
+                    Color.parseColor("#8055E8")
+                } else {
+                    Color.parseColor("#252431")
+                }
+            )
+            setStroke(
+                1,
+                if (isSelected) {
+                    Color.parseColor("#B49AFF")
+                } else {
+                    Color.parseColor("#454052")
+                }
+            )
+        }
+
+        return TextView(activity).apply {
+            text = if (isSelected) "✓ $tag" else tag
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            setPadding(14, 10, 14, 10)
+            this.background = background
+
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 8, 8)
+            }
+        }
+    }
+
+    private fun updateTagsHint(view: View?) {
+        val hint = view?.findViewById<TextView>(
+            R.id.postTagsHint
+        ) ?: return
+
+        val count = selectedGameTags.size + selectedTopicTags.size
+
+        hint.text = when {
+            availableGameTags.isEmpty() &&
+                    availableTopicTags.isEmpty() ->
+                "Сначала выбери игру и тип публикации"
+
+            count == 0 ->
+                "Нажимай на теги, чтобы выбрать подходящие"
+
+            else ->
+                "Выбрано тегов: $count"
+        }
+    }
+
+    // Предварительный просмотр изображения
     private fun showImagePreview(uri: Uri) {
         val view = currentView ?: return
 
         val imageArea = view.findViewById<FrameLayout>(
             R.id.imageUploadArea
         )
+
+        val placeholder = imageArea.findViewById<View>(
+            R.id.imageUploadPlaceholder
+        )
+        placeholder?.visibility = View.GONE
 
         val preview = imageArea.findViewWithTag<ImageView>(
             "post_image_preview"
@@ -268,6 +605,10 @@ class CreatePostManager(
             R.id.postGameSpinner
         ).selectedItem?.toString().orEmpty()
 
+        val selectedType = view.findViewById<Spinner>(
+            R.id.postTypeSpinner
+        ).selectedItem?.toString().orEmpty()
+
         val imageUri = selectedImageUri
         val user = FirebaseAuth.getInstance().currentUser
 
@@ -291,6 +632,16 @@ class CreatePostManager(
             return
         }
 
+        if (selectedType == "Выбери тип" || selectedType.isBlank()) {
+            showMessage("Выбери тип публикации")
+            return
+        }
+
+        if (selectedGameTags.isEmpty() && selectedTopicTags.isEmpty()) {
+            showMessage("Выбери хотя бы один тег")
+            return
+        }
+
         if (imageUri == null) {
             showMessage("Сначала выбери изображение")
             return
@@ -306,16 +657,27 @@ class CreatePostManager(
         activity.lifecycleScope.launch {
             try {
                 // Загружаем изображение в Supabase
-                val imageUrl = SupabaseStorageManager.uploadImage(
-                    activity,
-                    imageUri
-                )
+                val imageUrl = withContext(Dispatchers.IO) {
+                    SupabaseStorageManager.uploadImage(
+                        activity,
+                        imageUri
+                    )
+                }
 
-                // Формируем публикацию
+                val allTags = (
+                        selectedGameTags.toList() +
+                                selectedTopicTags.toList()
+                        ).distinct()
+
+                // Сохраняем публикацию и теги в Firestore
                 val post = hashMapOf(
                     "title" to title,
                     "content" to content,
                     "game" to selectedGame,
+                    "postType" to selectedType,
+                    "gameTags" to selectedGameTags.toList(),
+                    "topicTags" to selectedTopicTags.toList(),
+                    "tags" to allTags,
                     "imageUrl" to imageUrl,
                     "authorId" to user.uid,
                     "authorName" to (
@@ -326,7 +688,6 @@ class CreatePostManager(
                     "createdAt" to FieldValue.serverTimestamp()
                 )
 
-                // Сохраняем публикацию в Firestore
                 withContext(Dispatchers.IO) {
                     Tasks.await(
                         db.collection("posts").add(post)
@@ -344,6 +705,8 @@ class CreatePostManager(
                 ).text.clear()
 
                 selectedImageUri = null
+                selectedGameTags.clear()
+                selectedTopicTags.clear()
 
                 val imageArea = view.findViewById<FrameLayout>(
                     R.id.imageUploadArea
@@ -354,6 +717,13 @@ class CreatePostManager(
                 )?.let {
                     imageArea.removeView(it)
                 }
+
+                imageArea.findViewById<View>(
+                    R.id.imageUploadPlaceholder
+                )?.visibility = View.VISIBLE
+
+                renderTags()
+                updateTagsHint(view)
 
             } catch (e: Exception) {
                 android.util.Log.e(
