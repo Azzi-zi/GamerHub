@@ -1,6 +1,9 @@
 
 package com.example.gamerhub
 
+
+import android.view.Gravity
+import android.widget.FrameLayout
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -167,12 +170,23 @@ class PostsManager(
             }
         }
 
-        val image = ImageView(activity).apply {
+
+        // Контейнер изображения и категории поверх него
+        val imageContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 190
             )
+        }
+
+        // Обложка публикации
+        val image = ImageView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             scaleType = ImageView.ScaleType.CENTER_CROP
+            contentDescription = "Обложка публикации"
         }
 
         if (post.imageUrl.isNotBlank()) {
@@ -182,7 +196,33 @@ class PostsManager(
                 .into(image)
         }
 
-        card.addView(image)
+        imageContainer.addView(image)
+
+        // Синяя плашка с категорией в левом нижнем углу
+        val categoryLabel = TextView(activity).apply {
+            text = post.postType.uppercase()
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setTypeface(null, Typeface.BOLD)
+
+            background = androidx.core.content.ContextCompat.getDrawable(
+                activity,
+                R.drawable.bg_post_category
+            )
+
+            setPadding(12, 7, 12, 7)
+
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.START
+            ).apply {
+                setMargins(12, 12, 12, 12)
+            }
+        }
+
+        imageContainer.addView(categoryLabel)
+
 
         val textContainer = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -196,7 +236,7 @@ class PostsManager(
             bold: Boolean = false
         ) {
             val text = TextView(activity).apply {
-                this.text = value
+                text = value
                 textSize = size
                 setTextColor(color)
 
@@ -210,13 +250,7 @@ class PostsManager(
             textContainer.addView(text)
         }
 
-        addText(
-            post.postType.uppercase(),
-            11f,
-            Color.rgb(180, 110, 255),
-            true
-        )
-
+        // Заголовок публикации
         addText(
             post.title,
             19f,
@@ -224,18 +258,21 @@ class PostsManager(
             true
         )
 
+        // Игра
         addText(
             "🎮 ${post.game}",
             13f,
             Color.LTGRAY
         )
 
+        // Полный текст публикации
         addText(
             post.content,
             14f,
             Color.rgb(220, 220, 225)
         )
 
+        // Автор публикации
         val author = post.authorName.ifBlank {
             "Игрок GamerHub"
         }
@@ -246,6 +283,7 @@ class PostsManager(
             Color.rgb(160, 160, 170)
         )
 
+        // Теги публикации
         val tags = (post.gameTags + post.topicTags).distinct()
 
         if (tags.isNotEmpty()) {
@@ -256,6 +294,9 @@ class PostsManager(
             )
         }
 
+
+
+        card.addView(imageContainer)
         card.addView(textContainer)
 
         card.isClickable = true

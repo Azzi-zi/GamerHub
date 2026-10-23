@@ -61,32 +61,45 @@
             android:paddingEnd="20dp"
             android:paddingBottom="32dp">
 
-            <!-- Обложка публикации -->
-            <ImageView
-                android:id="@+id/postDetailsImage"
+            <!-- Обложка публикации с категорией -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="230dp"
-                android:background="#1A1A20"
-                android:scaleType="centerCrop"
-                android:contentDescription="Обложка публикации" />
+                android:background="#1A1A20">
 
-            <!-- Тип публикации -->
-            <TextView
-                android:id="@+id/postDetailsType"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="ГАЙДЫ"
-                android:textColor="#B46EFF"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                <!-- Изображение публикации -->
+                <ImageView
+                    android:id="@+id/postDetailsImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:contentDescription="Обложка публикации" />
+
+                <!-- Категория в левом нижнем углу -->
+                <TextView
+                    android:id="@+id/postDetailsType"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/bg_post_category"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
+                    android:text="ГАЙДЫ"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+            </FrameLayout>
 
             <!-- Заголовок -->
             <TextView
                 android:id="@+id/postDetailsTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="20dp"
                 android:text="Заголовок публикации"
                 android:textColor="#FFFFFF"
                 android:textSize="26sp"
@@ -139,6 +152,33 @@
                 android:layout_marginTop="24dp"
                 android:textColor="#B46EFF"
                 android:textSize="13sp" />
+
+            <!-- Панель лайков -->
+            <LinearLayout
+                android:id="@+id/postLikesPanel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/postLikeButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:minWidth="64dp"
+                    android:gravity="center"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:background="#1A1A20"
+                    android:text="🤍 0"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Поставить или убрать лайк" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
