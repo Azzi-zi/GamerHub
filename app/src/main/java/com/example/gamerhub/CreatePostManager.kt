@@ -656,6 +656,22 @@ class CreatePostManager(
 
         activity.lifecycleScope.launch {
             try {
+                // Получаем username текущего пользователя из publicProfiles
+                val profileSnapshot = withContext(Dispatchers.IO) {
+                    Tasks.await(
+                        db.collection("publicProfiles")
+                            .document(user.uid)
+                            .get()
+                    )
+                }
+
+                val username = profileSnapshot.getString("username")
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: user.displayName
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                    ?: "Игрок GamerHub"
                 // Загружаем изображение в Supabase
                 val imageUrl = withContext(Dispatchers.IO) {
                     SupabaseStorageManager.uploadImage(
@@ -680,11 +696,7 @@ class CreatePostManager(
                     "tags" to allTags,
                     "imageUrl" to imageUrl,
                     "authorId" to user.uid,
-                    "authorName" to (
-                            user.displayName
-                                ?: user.email
-                                ?: "Игрок"
-                            ),
+                    "authorName" to username,
                     "createdAt" to FieldValue.serverTimestamp()
                 )
 

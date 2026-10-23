@@ -534,6 +534,11 @@ class MainActivity : AppCompatActivity() {
         view.findViewById<TextView>(
             R.id.gameDetailsDescription
         ).text = game.description
+
+        postsManager.loadPostsForGame(
+            view = view,
+            gameTitle = game.title
+        )
     }
 
     // ============================================================

@@ -65,6 +65,7 @@ class HomeManager(
 
     // Настраиваем категории главной страницы
 
+
     private fun setupHomeCategories(view: View) {
         val categories = mapOf(
             R.id.category_all to "Все",
@@ -107,7 +108,14 @@ class HomeManager(
                     )
 
                 when (categoryName) {
-                    "Все", "Игры" -> {
+                    "Все" -> {
+                        gamesRecycler?.visibility = View.GONE
+                        postsScroll?.visibility = View.VISIBLE
+
+                        postsManager.loadPosts(view, "Все")
+                    }
+
+                    "Игры" -> {
                         gamesRecycler?.visibility = View.VISIBLE
                         postsScroll?.visibility = View.GONE
 

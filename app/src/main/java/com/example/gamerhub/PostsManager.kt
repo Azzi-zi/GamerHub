@@ -27,6 +27,65 @@ class PostsManager(
     fun setOnPostClickListener(listener: (Post) -> Unit) {
         onPostClick = listener
     }
+
+    fun loadPostsForGame(view: View, gameTitle: String) {
+        val container = view.findViewById<LinearLayout>(
+            R.id.gamePostsContainer
+        ) ?: return
+
+        activity.lifecycleScope.launch {
+            try {
+                val snapshot = db.collection("posts")
+                    .get()
+                    .await()
+
+                val posts = snapshot.documents
+                    .mapNotNull { document ->
+                        document.toObject(Post::class.java)?.copy(
+                            id = document.id
+                        )
+                    }
+                    .filter { post ->
+                        post.game.trim().equals(
+                            gameTitle.trim(),
+                            ignoreCase = true
+                        )
+                    }
+                    .reversed()
+
+                container.removeAllViews()
+
+                if (posts.isEmpty()) {
+                    val emptyText = TextView(activity).apply {
+                        text = "Публикаций об этой игре пока нет"
+                        textSize = 15f
+                        setTextColor(Color.LTGRAY)
+                        setPadding(0, 12, 0, 12)
+                    }
+
+                    container.addView(emptyText)
+                    return@launch
+                }
+
+                posts.forEach { post ->
+                    container.addView(createPostCard(post))
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "PostsManager",
+                    "Ошибка загрузки публикаций для игры: $gameTitle",
+                    e
+                )
+
+                Toast.makeText(
+                    activity,
+                    "Не удалось загрузить публикации игры",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
     // Загружаем публикации из Firestore
     fun loadPosts(view: View, category: String = "Все") {
         val container = view.findViewById<LinearLayout>(
@@ -177,8 +236,12 @@ class PostsManager(
             Color.rgb(220, 220, 225)
         )
 
+        val author = post.authorName.ifBlank {
+            "Игрок GamerHub"
+        }
+
         addText(
-            "Автор: ${post.authorName}",
+            "👤 $author",
             12f,
             Color.rgb(160, 160, 170)
         )

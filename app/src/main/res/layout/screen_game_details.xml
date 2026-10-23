@@ -87,14 +87,14 @@
 
         <!-- Пока пустое место под будущие публикации -->
 
-        <TextView
-            android:id="@+id/gamePostsPlaceholder"
+
+        <LinearLayout
+            android:id="@+id/gamePostsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Здесь будут публикации об этой игре."
-            android:textColor="#777780"
-            android:textSize="15sp" />
+            android:orientation="vertical" />
+
 
     </LinearLayout>
 
