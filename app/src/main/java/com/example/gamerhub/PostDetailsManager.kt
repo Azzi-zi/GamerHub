@@ -21,6 +21,7 @@ class PostDetailsManager(
     private val db = FirebaseFirestore.getInstance()
 
     private var likesListener: ListenerRegistration? = null
+    private var commentsManager: CommentsManager? = null
     private var isLiked = false
     private var isLikeRequestInProgress = false
 
@@ -87,6 +88,13 @@ class PostDetailsManager(
 
         // Подключаем лайки
         setupLikes(view)
+        // Подключаем комментарии
+        commentsManager = CommentsManager(
+            activity = activity,
+            postId = post.id
+        )
+
+        commentsManager?.setup(view)
     }
 
     private fun setupLikes(view: View) {
@@ -220,5 +228,8 @@ class PostDetailsManager(
     fun cleanup() {
         likesListener?.remove()
         likesListener = null
+
+        commentsManager?.cleanup()
+        commentsManager = null
     }
 }

@@ -180,6 +180,65 @@
 
             </LinearLayout>
 
+            <!-- Раздел комментариев -->
+            <LinearLayout
+                android:id="@+id/commentsSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Комментарии"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/commentsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/commentsEmptyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:text="Пока нет комментариев. Будь первым!"
+                    android:textColor="#A0A0AA"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/commentInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_search"
+                    android:hint="Напиши комментарий..."
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:maxLength="1000"
+                    android:minHeight="52dp"
+                    android:padding="12dp"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0AA" />
+
+                <Button
+                    android:id="@+id/sendCommentButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:backgroundTint="#3478F6"
+                    android:text="Отправить"
+                    android:textColor="#FFFFFF" />
+
+            </LinearLayout>
+
+
         </LinearLayout>
 
     </ScrollView>
