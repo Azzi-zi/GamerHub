@@ -1,13 +1,9 @@
 
 package com.example.gamerhub
 
-import android.widget.Toast
-import android.net.Uri
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.Spanned
@@ -18,7 +14,9 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -26,6 +24,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bumptech.glide.Glide
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
@@ -39,18 +39,18 @@ class MainActivity : AppCompatActivity() {
     // Менеджер мессенджера
     private lateinit var chatsManager: ChatsManager
 
+    // Менеджер создания публикаций
+    private lateinit var createPostManager: CreatePostManager
 
-    //обработчик галереи
-    // Функция, которая получит выбранную фотографию
+    // Обработчик выбора изображения для профиля
     private var avatarPickCallback: ((Uri) -> Unit)? = null
 
-    // Открываем системный выбор изображения
     private val avatarPicker =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-
+        registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
             if (uri != null) {
                 try {
-                    // Разрешаем приложению читать изображение после перезапуска
                     contentResolver.takePersistableUriPermission(
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -58,10 +58,10 @@ class MainActivity : AppCompatActivity() {
 
                     avatarPickCallback?.invoke(uri)
                 } catch (e: Exception) {
-                    android.widget.Toast.makeText(
+                    Toast.makeText(
                         this,
                         "Не удалось открыть фотографию",
-                        android.widget.Toast.LENGTH_SHORT
+                        Toast.LENGTH_SHORT
                     ).show()
                 } finally {
                     avatarPickCallback = null
@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    // Эту функцию будет вызывать ProfileManager
+    // Эту функцию вызывает ProfileManager
     fun openAvatarPicker(onPicked: (Uri) -> Unit) {
         avatarPickCallback = onPicked
         avatarPicker.launch(arrayOf("image/*"))
@@ -79,31 +79,31 @@ class MainActivity : AppCompatActivity() {
     // DATABASE
     // ============================================================
 
-
     companion object {
         private val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
 
-                // Создаём новую таблицу профилей с UID вместо id
-                db.execSQL("""
-                CREATE TABLE IF NOT EXISTS user_profiles_new (
-                    uid TEXT NOT NULL,
-                    username TEXT NOT NULL,
-                    tag TEXT NOT NULL,
-                    bio TEXT NOT NULL,
-                    PRIMARY KEY(uid)
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_profiles_new (
+                        uid TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        tag TEXT NOT NULL,
+                        bio TEXT NOT NULL,
+                        PRIMARY KEY(uid)
+                    )
+                    """.trimIndent()
                 )
-            """.trimIndent())
 
-                // Сохраняем старый профиль как устаревшую запись.
-                // Он не будет привязан к конкретному аккаунту.
-                db.execSQL("""
-                INSERT OR IGNORE INTO user_profiles_new
-                    (uid, username, tag, bio)
-                SELECT '', username, tag, bio
-                FROM user_profiles
-                WHERE id = 1
-            """.trimIndent())
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO user_profiles_new
+                        (uid, username, tag, bio)
+                    SELECT '', username, tag, bio
+                    FROM user_profiles
+                    WHERE id = 1
+                    """.trimIndent()
+                )
 
                 db.execSQL("DROP TABLE user_profiles")
                 db.execSQL(
@@ -112,16 +112,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    private val database by lazy {
-        Room.databaseBuilder(
-            applicationContext,
-            GamerHubDatabase::class.java,
-            "gamerhub_database"
-        )
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
-            .fallbackToDestructiveMigration()
-            .build()
-    }
+
     private val MIGRATION_5_6 = object : Migration(5, 6) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -131,6 +122,17 @@ class MainActivity : AppCompatActivity() {
                 "ALTER TABLE user_profiles ADD COLUMN avatarUri TEXT NOT NULL DEFAULT ''"
             )
         }
+    }
+
+    private val database by lazy {
+        Room.databaseBuilder(
+            applicationContext,
+            GamerHubDatabase::class.java,
+            "gamerhub_database"
+        )
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     private val repository by lazy {
@@ -156,27 +158,25 @@ class MainActivity : AppCompatActivity() {
 
         pageContainer = findViewById(R.id.pageContainer)
 
-        // Создаём менеджер после инициализации контейнера
+        // Создаём менеджеры после инициализации контейнера
         chatsManager = ChatsManager(this) { layoutId ->
             openPage(layoutId)
         }
+
+        createPostManager = CreatePostManager(this)
 
         ViewCompat.setOnApplyWindowInsetsListener(
             findViewById(R.id.main)
         ) { view, insets ->
 
-            // Отступы системных панелей: статус-бар и навигация
             val systemBars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars()
             )
 
-            // Отступ клавиатуры
             val ime = insets.getInsets(
                 WindowInsetsCompat.Type.ime()
             )
 
-            // Берём большую нижнюю границу:
-            // обычную системную панель или клавиатуру
             val bottomInset = maxOf(
                 systemBars.bottom,
                 ime.bottom
@@ -254,8 +254,13 @@ class MainActivity : AppCompatActivity() {
 
         pageContainer.addView(view)
 
-        // Вся настройка экранов мессенджера находится в ChatsManager
+        // Настройка экранов мессенджера
         chatsManager.setupPage(layoutId, view)
+
+        // Настройка экрана создания публикации
+        if (layoutId == R.layout.screen_create) {
+            createPostManager.setup(view)
+        }
     }
 
     // ============================================================
@@ -304,12 +309,9 @@ class MainActivity : AppCompatActivity() {
     // LOAD GAMES
     // ============================================================
 
-
-
     private fun loadGames() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // Загружаем готовый каталог из Firebase
                 val games = repository.getGames()
 
                 withContext(Dispatchers.Main) {
@@ -347,8 +349,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-
 
     // ============================================================
     // HOME GAMES
@@ -397,20 +397,15 @@ class MainActivity : AppCompatActivity() {
 
         val view = pageContainer.getChildAt(0)
 
-        // Кнопка возврата
         val backButton = view.findViewById<View>(
             R.id.backButton
         )
 
         backButton.setOnClickListener {
             openHomePage()
-
-            setActiveNav(
-                findViewById(R.id.navHome)
-            )
+            setActiveNav(findViewById(R.id.navHome))
         }
 
-        // Изображение игры
         val image = view.findViewById<ImageView>(
             R.id.gameDetailsImage
         )
@@ -431,17 +426,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Название
         view.findViewById<TextView>(
             R.id.gameDetailsTitle
         ).text = game.title
 
-        // Жанр
         view.findViewById<TextView>(
             R.id.gameDetailsGenre
         ).text = game.genre
 
-        // Описание
         view.findViewById<TextView>(
             R.id.gameDetailsDescription
         ).text = game.description
