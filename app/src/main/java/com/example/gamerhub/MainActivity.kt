@@ -270,14 +270,80 @@ class MainActivity : AppCompatActivity() {
     // HOME
     // ============================================================
 
+    private fun setupHomeCategories(view: View) {
+        val categories = mapOf(
+            R.id.category_all to "Все",
+            R.id.category_games to "Игры",
+            R.id.category_guides to "Гайды",
+            R.id.category_news to "Новости",
+            R.id.category_lore to "Лор"
+        )
+
+        fun selectCategory(selectedId: Int) {
+            categories.keys.forEach { categoryId ->
+                val category = view.findViewById<TextView>(categoryId)
+                    ?: return@forEach
+
+                val isSelected = categoryId == selectedId
+
+                category.setBackgroundResource(
+                    if (isSelected) {
+                        R.drawable.bg_category_active
+                    } else {
+                        R.drawable.bg_category
+                    }
+                )
+
+                category.setTextColor(
+                    if (isSelected) {
+                        Color.WHITE
+                    } else {
+                        Color.rgb(170, 170, 170)
+                    }
+                )
+            }
+
+            val selectedCategory = categories[selectedId] ?: return
+
+            when (selectedCategory) {
+                "Все", "Игры" -> {
+                    view.findViewById<RecyclerView>(
+                        R.id.gamesRecyclerView
+                    )?.visibility = View.VISIBLE
+
+                    loadGames()
+                }
+
+                "Гайды", "Новости", "Лор" -> {
+                    Toast.makeText(
+                        this,
+                        "Категория «$selectedCategory». " +
+                                "Подключим публикации следующим этапом.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        categories.keys.forEach { categoryId ->
+            view.findViewById<TextView>(categoryId)
+                ?.setOnClickListener {
+                    selectCategory(categoryId)
+                }
+        }
+
+        selectCategory(R.id.category_all)
+    }
     private fun openHomePage() {
         openPage(R.layout.screen_home)
 
         val view = pageContainer.getChildAt(0)
 
         setupHomeLogo(view)
+        setupHomeCategories(view)
         loadGames()
     }
+
 
     private fun setupHomeLogo(view: View) {
         val title = view.findViewById<TextView>(R.id.logoText)
