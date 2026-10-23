@@ -35,6 +35,9 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var pageContainer: FrameLayout
+    private lateinit var homeManager: HomeManager
+
+    private lateinit var postsManager: PostsManager
 
     // Менеджер мессенджера
     private lateinit var chatsManager: ChatsManager
@@ -158,6 +161,11 @@ class MainActivity : AppCompatActivity() {
 
         pageContainer = findViewById(R.id.pageContainer)
 
+        postsManager = PostsManager(this)
+        postsManager.setOnPostClickListener { post ->
+            openPostDetails(post)
+        }
+
         // Создаём менеджеры после инициализации контейнера
         chatsManager = ChatsManager(this) { layoutId ->
             openPage(layoutId)
@@ -166,6 +174,14 @@ class MainActivity : AppCompatActivity() {
         createPostManager = CreatePostManager(
             this,
             repository
+        )
+        homeManager = HomeManager(
+            activity = this,
+            repository = repository,
+            postsManager = postsManager,
+            onGameClick = { game ->
+                openGameDetails(game)
+            }
         )
 
         ViewCompat.setOnApplyWindowInsetsListener(
@@ -334,14 +350,26 @@ class MainActivity : AppCompatActivity() {
 
         selectCategory(R.id.category_all)
     }
+    private fun openPostDetails(post: Post) {
+        openPage(R.layout.screen_post_details)
+
+        val view = pageContainer.getChildAt(0)
+
+        PostDetailsManager(
+            activity = this,
+            post = post,
+            onBack = {
+                openHomePage()
+                setActiveNav(findViewById(R.id.navHome))
+            }
+        ).setup(view)
+    }
     private fun openHomePage() {
         openPage(R.layout.screen_home)
 
         val view = pageContainer.getChildAt(0)
 
-        setupHomeLogo(view)
-        setupHomeCategories(view)
-        loadGames()
+        homeManager.setup(view)
     }
 
 
