@@ -38,6 +38,54 @@ class CreatePostManager(
 
     private val db = FirebaseFirestore.getInstance()
 
+    private fun setupPostTypeSpinner(view: View) {
+        val spinner = view.findViewById<Spinner>(R.id.postTypeSpinner)
+
+        val postTypes = listOf(
+            "Выбери тип",
+            "Игры",
+            "Гайды",
+            "Новости",
+            "Лор"
+        )
+
+        val adapter = object : ArrayAdapter<String>(
+            activity,
+            android.R.layout.simple_spinner_item,
+            postTypes
+        ) {
+            override fun getView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val textView = super.getView(position, convertView, parent) as TextView
+                textView.setTextColor(Color.WHITE)
+                textView.textSize = 15f
+                return textView
+            }
+
+            override fun getDropDownView(
+                position: Int,
+                convertView: View?,
+                parent: ViewGroup
+            ): View {
+                val textView = super.getDropDownView(position, convertView, parent) as TextView
+                textView.setTextColor(Color.WHITE)
+                textView.setBackgroundColor(Color.parseColor("#201F2D"))
+                textView.textSize = 15f
+                textView.setPadding(24, 24, 24, 24)
+                return textView
+            }
+        }
+
+        adapter.setDropDownViewResource(
+            android.R.layout.simple_spinner_dropdown_item
+        )
+
+        spinner.adapter = adapter
+        spinner.setSelection(0)
+    }
     // Выбор изображения
     private val imagePicker =
         activity.registerForActivityResult(
@@ -63,6 +111,7 @@ class CreatePostManager(
         currentView = view
 
         setupGameSpinner(view)
+        setupPostTypeSpinner(view)
 
         view.findViewById<FrameLayout>(
             R.id.imageUploadArea
