@@ -2,8 +2,13 @@
 package com.example.gamerhub
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -15,15 +20,25 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
+import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CreatePostManager(
-    private val activity: AppCompatActivity
+    private val activity: AppCompatActivity,
+    private val repository: GameRepository
 ) {
+
     private var currentView: View? = null
     private var selectedImageUri: Uri? = null
 
-    // Регистрируем системный выбор изображения
+    private val db = FirebaseFirestore.getInstance()
+
+    // Выбор изображения
     private val imagePicker =
         activity.registerForActivityResult(
             ActivityResultContracts.OpenDocument()
@@ -34,36 +49,127 @@ class CreatePostManager(
                         uri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
-
-                    selectedImageUri = uri
-                    showImagePreview(uri)
-                } catch (e: Exception) {
-                    // Иногда разрешение уже выдано или не требуется.
-                    // Пробуем показать выбранное изображение в любом случае.
-                    selectedImageUri = uri
-                    showImagePreview(uri)
+                } catch (_: Exception) {
+                    // Разрешение может быть уже доступно.
                 }
+
+                selectedImageUri = uri
+                showImagePreview(uri)
             }
         }
 
-    // Настраиваем экран создания публикации
+    // Настройка экрана создания публикации
     fun setup(view: View) {
         currentView = view
 
-        val imageArea = view.findViewById<FrameLayout>(
-            R.id.imageUploadArea
-        )
+        setupGameSpinner(view)
 
-        imageArea.setOnClickListener {
+        view.findViewById<FrameLayout>(
+            R.id.imageUploadArea
+        ).setOnClickListener {
             imagePicker.launch(arrayOf("image/*"))
         }
 
-        val publishButton = view.findViewById<Button>(
+        view.findViewById<Button>(
             R.id.publishButton
+        ).setOnClickListener {
+            publishPost()
+        }
+    }
+
+    // Загружаем игры из того же каталога, что и на главной странице
+    private fun setupGameSpinner(view: View) {
+        val spinner = view.findViewById<Spinner>(
+            R.id.postGameSpinner
         )
 
-        publishButton.setOnClickListener {
-            uploadPostImage()
+        activity.lifecycleScope.launch {
+            try {
+                val games = try {
+                    repository.getGames()
+                } catch (e: Exception) {
+                    repository.getLocalGames()
+                }
+
+                val gameTitles = games
+                    .map { it.title }
+                    .distinct()
+                    .sorted()
+
+                if (gameTitles.isEmpty()) {
+                    showMessage("Список игр пуст")
+                    return@launch
+                }
+
+                val adapter = object : ArrayAdapter<String>(
+                    activity,
+                    android.R.layout.simple_spinner_item,
+                    gameTitles
+                ) {
+                    private fun createGameTextView(
+                        convertView: View?,
+                        paddingStart: Int,
+                        paddingTop: Int
+                    ): TextView {
+                        return (convertView as? TextView
+                            ?: TextView(activity)).apply {
+                            setPadding(
+                                paddingStart,
+                                paddingTop,
+                                paddingStart,
+                                paddingTop
+                            )
+                            textSize = 15f
+                            setTextColor(Color.WHITE)
+                            gravity = Gravity.CENTER_VERTICAL
+                        }
+                    }
+
+                    override fun getView(
+                        position: Int,
+                        convertView: View?,
+                        parent: ViewGroup
+                    ): View {
+                        return createGameTextView(
+                            convertView,
+                            12,
+                            0
+                        ).apply {
+                            text = getItem(position)
+                        }
+                    }
+
+                    override fun getDropDownView(
+                        position: Int,
+                        convertView: View?,
+                        parent: ViewGroup
+                    ): View {
+                        return createGameTextView(
+                            convertView,
+                            20,
+                            14
+                        ).apply {
+                            text = getItem(position)
+                            setBackgroundColor(
+                                Color.rgb(30, 30, 38)
+                            )
+                        }
+                    }
+                }
+
+                spinner.adapter = adapter
+                spinner.setPopupBackgroundDrawable(
+                    ColorDrawable(Color.rgb(30, 30, 38))
+                )
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "CreatePostManager",
+                    "Не удалось загрузить игры",
+                    e
+                )
+                showMessage("Не удалось загрузить список игр")
+            }
         }
     }
 
@@ -97,8 +203,8 @@ class CreatePostManager(
         preview.bringToFront()
     }
 
-    // Проверяем поля и загружаем изображение в Supabase
-    private fun uploadPostImage() {
+    // Проверяем данные и публикуем запись
+    private fun publishPost() {
         val view = currentView ?: return
 
         val title = view.findViewById<EditText>(
@@ -109,47 +215,35 @@ class CreatePostManager(
             R.id.postContent
         ).text.toString().trim()
 
-        val gameSpinner = view.findViewById<Spinner>(
+        val selectedGame = view.findViewById<Spinner>(
             R.id.postGameSpinner
-        )
+        ).selectedItem?.toString().orEmpty()
+
+        val imageUri = selectedImageUri
+        val user = FirebaseAuth.getInstance().currentUser
+
+        if (user == null) {
+            showMessage("Сначала войди в аккаунт")
+            return
+        }
 
         if (title.isBlank()) {
-            Toast.makeText(
-                activity,
-                "Введи название публикации",
-                Toast.LENGTH_SHORT
-            ).show()
+            showMessage("Введи название публикации")
             return
         }
 
         if (content.isBlank()) {
-            Toast.makeText(
-                activity,
-                "Добавь текст публикации",
-                Toast.LENGTH_SHORT
-            ).show()
+            showMessage("Добавь текст публикации")
             return
         }
-
-        val imageUri = selectedImageUri
-
-        if (imageUri == null) {
-            Toast.makeText(
-                activity,
-                "Сначала выбери изображение",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
-        val selectedGame = gameSpinner.selectedItem?.toString().orEmpty()
 
         if (selectedGame.isBlank()) {
-            Toast.makeText(
-                activity,
-                "Выбери игру",
-                Toast.LENGTH_SHORT
-            ).show()
+            showMessage("Выбери игру")
+            return
+        }
+
+        if (imageUri == null) {
+            showMessage("Сначала выбери изображение")
             return
         }
 
@@ -158,39 +252,84 @@ class CreatePostManager(
         )
 
         publishButton.isEnabled = false
-        publishButton.text = "Загрузка изображения..."
+        publishButton.text = "Загрузка..."
 
         activity.lifecycleScope.launch {
             try {
+                // Загружаем изображение в Supabase
                 val imageUrl = SupabaseStorageManager.uploadImage(
                     activity,
                     imageUri
                 )
 
-                // Ссылка готова для сохранения вместе с публикацией.
-                // Сохранение в Firestore подключим отдельно,
-                // когда определим структуру коллекции публикаций.
-                Toast.makeText(
-                    activity,
-                    "Изображение загружено в Supabase",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                android.util.Log.d(
-                    "CreatePostManager",
-                    "Название: $title; игра: $selectedGame; " +
-                            "ссылка: $imageUrl; текст: $content"
+                // Формируем публикацию
+                val post = hashMapOf(
+                    "title" to title,
+                    "content" to content,
+                    "game" to selectedGame,
+                    "imageUrl" to imageUrl,
+                    "authorId" to user.uid,
+                    "authorName" to (
+                            user.displayName
+                                ?: user.email
+                                ?: "Игрок"
+                            ),
+                    "createdAt" to FieldValue.serverTimestamp()
                 )
+
+                // Сохраняем публикацию в Firestore
+                withContext(Dispatchers.IO) {
+                    Tasks.await(
+                        db.collection("posts").add(post)
+                    )
+                }
+
+                showMessage("Публикация успешно создана")
+
+                view.findViewById<EditText>(
+                    R.id.postTitle
+                ).text.clear()
+
+                view.findViewById<EditText>(
+                    R.id.postContent
+                ).text.clear()
+
+                selectedImageUri = null
+
+                val imageArea = view.findViewById<FrameLayout>(
+                    R.id.imageUploadArea
+                )
+
+                imageArea.findViewWithTag<View>(
+                    "post_image_preview"
+                )?.let {
+                    imageArea.removeView(it)
+                }
+
             } catch (e: Exception) {
-                Toast.makeText(
-                    activity,
-                    "Ошибка загрузки: ${e.message ?: "неизвестная ошибка"}",
-                    Toast.LENGTH_LONG
-                ).show()
+                android.util.Log.e(
+                    "CreatePostManager",
+                    "Ошибка создания публикации",
+                    e
+                )
+
+                showMessage(
+                    "Не удалось опубликовать: ${
+                        e.message ?: "неизвестная ошибка"
+                    }"
+                )
             } finally {
                 publishButton.isEnabled = true
                 publishButton.text = "Опубликовать"
             }
         }
+    }
+
+    private fun showMessage(message: String) {
+        Toast.makeText(
+            activity,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
     }
 }

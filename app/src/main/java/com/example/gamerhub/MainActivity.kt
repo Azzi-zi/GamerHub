@@ -163,7 +163,10 @@ class MainActivity : AppCompatActivity() {
             openPage(layoutId)
         }
 
-        createPostManager = CreatePostManager(this)
+        createPostManager = CreatePostManager(
+            this,
+            repository
+        )
 
         ViewCompat.setOnApplyWindowInsetsListener(
             findViewById(R.id.main)
