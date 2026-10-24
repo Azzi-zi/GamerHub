@@ -55,6 +55,18 @@ class GameRepository(
         }
     }
 
+
+    // Возвращает самые популярные игры по количеству лайков.
+    suspend fun getPopularGames(limit: Int = 8): List<Game> {
+        return getGames()
+            .sortedWith(
+                compareByDescending<Game> { it.likesCount }
+                    .thenBy { it.title.lowercase() }
+            )
+            .take(limit.coerceAtLeast(0))
+    }
+
+
     // Ставит или убирает лайк текущего пользователя.
     suspend fun setGameLike(
         firestoreId: String,
