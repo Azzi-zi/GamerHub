@@ -31,8 +31,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class CreatePostManager(
-    private val activity: AppCompatActivity,
-    private val repository: GameRepository
+    private val activity: AppCompatActivity
+
 ) {
 
     private var currentView: View? = null
@@ -134,6 +134,7 @@ class CreatePostManager(
     }
 
     // Загрузка списка игр
+    // Загружаем список игр напрямую из Firestore
     private fun setupGameSpinner(view: View) {
         val spinner = view.findViewById<Spinner>(
             R.id.postGameSpinner
@@ -141,14 +142,16 @@ class CreatePostManager(
 
         activity.lifecycleScope.launch {
             try {
-                val games = try {
-                    repository.getGames()
-                } catch (e: Exception) {
-                    repository.getLocalGames()
+                val snapshot = withContext(Dispatchers.IO) {
+                    Tasks.await(
+                        db.collection("games").get()
+                    )
                 }
 
-                val gameTitles = games
-                    .map { it.title }
+                val gameTitles = snapshot.documents
+                    .mapNotNull { document ->
+                        document.getString("title")
+                    }
                     .distinct()
                     .sorted()
 
@@ -214,12 +217,14 @@ class CreatePostManager(
                 }
 
                 spinner.adapter = adapter
+
                 spinner.setPopupBackgroundDrawable(
                     ColorDrawable(Color.rgb(30, 30, 38))
                 )
 
                 spinner.onItemSelectedListener =
                     object : android.widget.AdapterView.OnItemSelectedListener {
+
                         override fun onItemSelected(
                             parent: android.widget.AdapterView<*>?,
                             itemView: View?,
@@ -241,14 +246,16 @@ class CreatePostManager(
             } catch (e: Exception) {
                 android.util.Log.e(
                     "CreatePostManager",
-                    "Не удалось загрузить игры",
+                    "Не удалось загрузить игры из Firestore",
                     e
                 )
-                showMessage("Не удалось загрузить список игр")
+
+                showMessage(
+                    "Не удалось загрузить игры из Firebase. Проверь подключение и правила Firestore."
+                )
             }
         }
     }
-
     // Настройка списка типов публикаций
     private fun setupPostTypeSpinner(view: View) {
         val spinner = view.findViewById<Spinner>(

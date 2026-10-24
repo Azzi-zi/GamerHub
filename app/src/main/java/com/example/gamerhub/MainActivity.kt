@@ -172,8 +172,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         createPostManager = CreatePostManager(
-            this,
-            repository
+            this
         )
         homeManager = HomeManager(
             activity = this,
