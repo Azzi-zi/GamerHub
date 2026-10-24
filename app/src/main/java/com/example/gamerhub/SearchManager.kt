@@ -1,3 +1,4 @@
+
 package com.example.gamerhub
 
 import android.graphics.Color
@@ -8,15 +9,15 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
 
 class SearchManager(
     private val activity: MainActivity,
@@ -25,8 +26,19 @@ class SearchManager(
     private val onGameClick: (Game) -> Unit
 ) {
 
-    fun setup(view: View) {
+    // Кэш каталога: загружаем игры только один раз на экземпляр менеджера.
+    private var cachedGames: List<Game>? = null
 
+    // Задача текущего поиска.
+    private var searchJob: Job? = null
+
+    // Версия поиска защищает от устаревших результатов.
+    private var searchVersion = 0
+
+    // Текущая выбранная категория.
+    private var selectedCategory = "Все"
+
+    fun setup(view: View) {
         val searchInput = view.findViewById<EditText>(
             R.id.searchGamesInput
         )
@@ -71,38 +83,19 @@ class SearchManager(
             R.id.trendingGta
         )
 
-
-        // ========================================================
-        // SEARCH RECYCLERVIEW
-        // ========================================================
-
         val recyclerView = view.findViewById<RecyclerView>(
             R.id.searchGamesRecyclerView
         )
 
-        recyclerView.layoutManager = GridLayoutManager(
-            activity,
-            2
-        )
-
+        recyclerView.layoutManager = GridLayoutManager(activity, 2)
         recyclerView.isNestedScrollingEnabled = false
 
+        // Загружаем каталог или используем кэш.
+        loadSearchGames(recyclerView, resultsTitle)
 
-        // ========================================================
-        // INITIAL GAMES
-        // ========================================================
-
-        loadSearchGames(
-            recyclerView,
-            resultsTitle
-        )
-
-
-        // ========================================================
-        // CATEGORIES
-        // ========================================================
-
+        // Категория «Все».
         categoryAll.setOnClickListener {
+            selectedCategory = "Все"
 
             updateCategoryButtons(
                 categoryAll,
@@ -110,17 +103,19 @@ class SearchManager(
                 categoryRpg,
                 categorySandbox,
                 categoryOnline,
-                "Все"
+                selectedCategory
             )
 
-            loadSearchGames(
+            showFilteredGames(
                 recyclerView,
-                resultsTitle
+                resultsTitle,
+                searchInput.text.toString()
             )
         }
 
-
+        // Категория Action.
         categoryAction.setOnClickListener {
+            selectedCategory = "Action"
 
             updateCategoryButtons(
                 categoryAll,
@@ -128,17 +123,19 @@ class SearchManager(
                 categoryRpg,
                 categorySandbox,
                 categoryOnline,
-                "Action"
+                selectedCategory
             )
 
-            filterGames(
+            showFilteredGames(
                 recyclerView,
-                "Action"
+                resultsTitle,
+                searchInput.text.toString()
             )
         }
 
-
+        // Категория RPG.
         categoryRpg.setOnClickListener {
+            selectedCategory = "RPG"
 
             updateCategoryButtons(
                 categoryAll,
@@ -146,17 +143,19 @@ class SearchManager(
                 categoryRpg,
                 categorySandbox,
                 categoryOnline,
-                "RPG"
+                selectedCategory
             )
 
-            filterGames(
+            showFilteredGames(
                 recyclerView,
-                "RPG"
+                resultsTitle,
+                searchInput.text.toString()
             )
         }
 
-
+        // Категория Sandbox.
         categorySandbox.setOnClickListener {
+            selectedCategory = "Sandbox"
 
             updateCategoryButtons(
                 categoryAll,
@@ -164,17 +163,19 @@ class SearchManager(
                 categoryRpg,
                 categorySandbox,
                 categoryOnline,
-                "Sandbox"
+                selectedCategory
             )
 
-            filterGames(
+            showFilteredGames(
                 recyclerView,
-                "Sandbox"
+                resultsTitle,
+                searchInput.text.toString()
             )
         }
 
-
+        // Категория Online.
         categoryOnline.setOnClickListener {
+            selectedCategory = "Online"
 
             updateCategoryButtons(
                 categoryAll,
@@ -182,20 +183,17 @@ class SearchManager(
                 categoryRpg,
                 categorySandbox,
                 categoryOnline,
-                "Online"
+                selectedCategory
             )
 
-            filterGames(
+            showFilteredGames(
                 recyclerView,
-                "Online"
+                resultsTitle,
+                searchInput.text.toString()
             )
         }
 
-
-        // ========================================================
-        // SEARCH TEXT
-        // ========================================================
-
+        // Поиск по названию игры.
         searchInput.addTextChangedListener(
             object : TextWatcher {
 
@@ -204,9 +202,7 @@ class SearchManager(
                     start: Int,
                     count: Int,
                     after: Int
-                ) {
-                }
-
+                ) = Unit
 
                 override fun onTextChanged(
                     s: CharSequence?,
@@ -214,180 +210,192 @@ class SearchManager(
                     before: Int,
                     count: Int
                 ) {
+                    val query = s?.toString()?.trim().orEmpty()
 
-                    val query = s
-                        ?.toString()
-                        ?.trim()
-                        ?: ""
-
+                    clearButton.visibility =
+                        if (query.isBlank()) View.GONE else View.VISIBLE
 
                     if (query.isBlank()) {
+                        searchJob?.cancel()
+                        searchVersion++
 
-                        clearButton.visibility = View.GONE
                         resultsTitle.visibility = View.GONE
 
-                        loadSearchGames(
+                        showFilteredGames(
                             recyclerView,
-                            resultsTitle
+                            resultsTitle,
+                            ""
                         )
 
                         return
                     }
 
-
-                    clearButton.visibility = View.VISIBLE
                     resultsTitle.visibility = View.VISIBLE
 
+                    // Отменяем предыдущий поиск.
+                    searchJob?.cancel()
+                    val currentVersion = ++searchVersion
 
+                    searchJob = activity.lifecycleScope.launch {
+                        // Небольшая пауза после ввода.
+                        delay(250)
 
-                    activity.lifecycleScope.launch(Dispatchers.IO) {
-                        val games = getGamesSafely().filter {
-                            it.title.contains(query, ignoreCase = true)
+                        // Если каталог ещё загружается, загружаем его.
+                        val games = cachedGames ?: getGamesSafely().also {
+                            cachedGames = it
                         }
 
-                        withContext(Dispatchers.Main) {
-                            recyclerView.adapter = GameAdapter(
-                                games,
-                                repository,
-                                activity
-                            ) { game ->
-                                onGameClick(game)
-                            }
+                        // Не применяем результат старого запроса.
+                        if (currentVersion != searchVersion) {
+                            return@launch
+                        }
 
-                            resultsTitle.text = if (games.isEmpty()) {
-                                "Ничего не найдено"
-                            } else {
-                                "Найдено: ${games.size}"
-                            }
+                        val filteredGames = withContext(Dispatchers.Default) {
+                            filterGamesList(games, query, selectedCategory)
+                        }
+
+                        if (currentVersion != searchVersion) {
+                            return@launch
+                        }
+
+                        displayGames(recyclerView, filteredGames)
+
+                        resultsTitle.text = if (filteredGames.isEmpty()) {
+                            "Ничего не найдено"
+                        } else {
+                            "Найдено: ${filteredGames.size}"
                         }
                     }
-
                 }
 
-
-                override fun afterTextChanged(
-                    s: Editable?
-                ) {
-                }
+                override fun afterTextChanged(s: Editable?) = Unit
             }
         )
 
-
-        // ========================================================
-        // CLEAR SEARCH
-        // ========================================================
-
+        // Очистка поиска.
         clearButton.setOnClickListener {
-
             searchInput.text.clear()
             searchInput.requestFocus()
         }
 
-
-        // ========================================================
-        // TRENDING
-        // ========================================================
-
+        // Популярный запрос: Minecraft.
         trendingMinecraft.setOnClickListener {
-
             searchInput.setText("Minecraft")
-
-            searchInput.setSelection(
-                searchInput.text.length
-            )
+            searchInput.setSelection(searchInput.text.length)
         }
 
-
+        // Популярный запрос: Genshin Impact.
         trendingGenshin.setOnClickListener {
-
             searchInput.setText("Genshin Impact")
-
-            searchInput.setSelection(
-                searchInput.text.length
-            )
+            searchInput.setSelection(searchInput.text.length)
         }
 
-
+        // Популярный запрос: GTA VI.
         trendingGta.setOnClickListener {
-
             searchInput.setText("GTA VI")
-
-            searchInput.setSelection(
-                searchInput.text.length
-            )
+            searchInput.setSelection(searchInput.text.length)
         }
     }
 
-
-    // ============================================================
-    // LOAD SEARCH GAMES
-    // ============================================================
-
-
+    // Загружаем каталог и сохраняем его в кэше.
     private fun loadSearchGames(
         recyclerView: RecyclerView,
         resultsTitle: TextView
     ) {
-        activity.lifecycleScope.launch(Dispatchers.IO) {
-            val games = getGamesSafely()
+        val cached = cachedGames
 
-            withContext(Dispatchers.Main) {
-                recyclerView.adapter = GameAdapter(
-                    games,
-                    repository,
-                    activity
-                ) { game ->
-                    onGameClick(game)
-                }
+        if (cached != null) {
+            displayGames(recyclerView, cached)
+            resultsTitle.visibility = View.GONE
+            return
+        }
 
+        activity.lifecycleScope.launch {
+            try {
+                val games = getGamesSafely()
+                cachedGames = games
+
+                displayGames(recyclerView, games)
                 resultsTitle.visibility = View.GONE
 
-                if (games.isEmpty()) {
-                    android.util.Log.w(
-                        "GamerHubSearch",
-                        "Каталог пуст: игры не найдены ни в Firebase, ни в Room"
-                    )
-                }
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "GamerHubSearch",
+                    "Ошибка загрузки каталога",
+                    e
+                )
+
+                resultsTitle.visibility = View.VISIBLE
+                resultsTitle.text = "Не удалось загрузить игры"
             }
         }
     }
 
-
-
-    // ============================================================
-    // FILTER GAMES
-    // ============================================================
-
-
-
-    private fun filterGames(
+    // Фильтруем уже загруженные игры без нового запроса к Firebase.
+    private fun showFilteredGames(
         recyclerView: RecyclerView,
-        category: String
+        resultsTitle: TextView,
+        query: String
     ) {
-        activity.lifecycleScope.launch(Dispatchers.IO) {
-            val games = getGamesSafely().filter {
-                it.genre.contains(category, ignoreCase = true)
-            }
+        val games = cachedGames
 
-            withContext(Dispatchers.Main) {
-                recyclerView.adapter = GameAdapter(
-                    games,
-                    repository,
-                    activity
-                ) { game ->
-                    onGameClick(game)
-                }
+        if (games == null) {
+            loadSearchGames(recyclerView, resultsTitle)
+            return
+        }
+
+        val filtered = filterGamesList(
+            games,
+            query,
+            selectedCategory
+        )
+
+        displayGames(recyclerView, filtered)
+
+        if (query.isBlank()) {
+            resultsTitle.visibility = View.GONE
+        } else {
+            resultsTitle.visibility = View.VISIBLE
+            resultsTitle.text = if (filtered.isEmpty()) {
+                "Ничего не найдено"
+            } else {
+                "Найдено: ${filtered.size}"
             }
         }
     }
 
+    // Общая фильтрация по названию и категории.
+    private fun filterGamesList(
+        games: List<Game>,
+        query: String,
+        category: String
+    ): List<Game> {
+        return games.filter { game ->
+            val matchesQuery = query.isBlank() ||
+                    game.title.contains(query, ignoreCase = true)
 
+            val matchesCategory = category == "Все" ||
+                    game.genre.contains(category, ignoreCase = true)
 
+            matchesQuery && matchesCategory
+        }
+    }
 
-    // ============================================================
-    // CATEGORY BUTTONS
-    // ============================================================
+    // Отображаем карточки игр.
+    private fun displayGames(
+        recyclerView: RecyclerView,
+        games: List<Game>
+    ) {
+        recyclerView.adapter = GameAdapter(
+            games,
+            repository,
+            activity
+        ) { game ->
+            onGameClick(game)
+        }
+    }
 
+    // Обновляем оформление кнопок категорий.
     private fun updateCategoryButtons(
         all: TextView,
         action: TextView,
@@ -396,7 +404,6 @@ class SearchManager(
         online: TextView,
         selected: String
     ) {
-
         val buttons = listOf(
             all,
             action,
@@ -405,49 +412,31 @@ class SearchManager(
             online
         )
 
-
-        // Сначала делаем все категории неактивными
-
         buttons.forEach {
-
-            it.setTextColor(
-                Color.rgb(170, 170, 170)
-            )
-
-            it.setBackgroundResource(
-                R.drawable.bg_category
-            )
+            it.setTextColor(Color.rgb(170, 170, 170))
+            it.setBackgroundResource(R.drawable.bg_category)
         }
 
-
-        // Определяем выбранную категорию
-
         val selectedButton = when (selected) {
-
             "Action" -> action
             "RPG" -> rpg
             "Sandbox" -> sandbox
             "Online" -> online
-
             else -> all
         }
 
-
-        // Делаем выбранную категорию активной
-
-        selectedButton.setTextColor(
-            Color.WHITE
-        )
-
+        selectedButton.setTextColor(Color.WHITE)
         selectedButton.setBackgroundResource(
             R.drawable.bg_category_active
         )
     }
 
+    // Firebase — основной источник, Room — резервный.
     private suspend fun getGamesSafely(): List<Game> {
         return try {
-            // Основной источник — Firebase
-            repository.getGames()
+            withContext(Dispatchers.IO) {
+                repository.getGames()
+            }
         } catch (e: Exception) {
             android.util.Log.e(
                 "GamerHubSearch",
@@ -455,18 +444,19 @@ class SearchManager(
                 e
             )
 
-            // Если Firebase недоступен — пробуем локальную базу
             try {
-                repository.getLocalGames()
+                withContext(Dispatchers.IO) {
+                    repository.getLocalGames()
+                }
             } catch (localError: Exception) {
                 android.util.Log.e(
                     "GamerHubSearch",
                     "Ошибка загрузки каталога из Room",
                     localError
                 )
+
                 emptyList()
             }
         }
     }
-
 }

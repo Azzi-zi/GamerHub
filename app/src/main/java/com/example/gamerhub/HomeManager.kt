@@ -23,6 +23,11 @@ class HomeManager(
     private val postsManager: PostsManager,
     private val onGameClick: (Game) -> Unit
 ) {
+    // Кэш каталога, чтобы не загружать игры при каждом переходе.
+    private var cachedGames: List<Game>? = null
+
+    // Не допускаем одновременную загрузку одного каталога.
+    private var isLoadingGames = false
 
     // Настраиваем главную страницу
     fun setup(view: View) {
@@ -137,11 +142,28 @@ class HomeManager(
     // Загружаем игры напрямую из Firestore
 
     // Загружаем игры вместе с количеством лайков из Firebase.
+
     private fun loadGames(view: View) {
+        // Если каталог уже загружен, показываем сохранённые данные.
+        val cached = cachedGames
+
+        if (cached != null) {
+            showGames(view, cached)
+            return
+        }
+
+        // Не запускаем повторную загрузку, пока первая не закончилась.
+        if (isLoadingGames) return
+
+        isLoadingGames = true
+
         activity.lifecycleScope.launch {
             try {
-                val games = repository.getGames()
+                val games = withContext(Dispatchers.IO) {
+                    repository.getGames()
+                }
 
+                cachedGames = games
                 showGames(view, games)
 
                 if (games.isEmpty()) {
@@ -163,9 +185,12 @@ class HomeManager(
                     "Не удалось загрузить каталог игр: ${e.localizedMessage}",
                     Toast.LENGTH_LONG
                 ).show()
+            } finally {
+                isLoadingGames = false
             }
         }
     }
+
 
 
     // Показываем игры в сетке из двух колонок
@@ -178,6 +203,10 @@ class HomeManager(
         ) ?: return
 
         recyclerView.layoutManager = GridLayoutManager(activity, 2)
+
+        if (recyclerView.layoutManager == null) {
+            recyclerView.layoutManager = GridLayoutManager(activity, 2)
+        }
 
         recyclerView.adapter = GameAdapter(
             games,
