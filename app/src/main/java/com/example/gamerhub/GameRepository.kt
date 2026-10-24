@@ -1,6 +1,11 @@
 
 package com.example.gamerhub
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -16,43 +21,65 @@ class GameRepository(
     private val firestore = FirebaseFirestore.getInstance()
     private val gamesCollection = firestore.collection("games")
 
+    // Общий кэш каталога для всех разделов приложения.
+    @Volatile
+    private var cachedGames: List<Game>? = null
+
+    // Не даём нескольким разделам одновременно загружать каталог.
+    private val gamesMutex = Mutex()
     // Загружаем каталог и лайки из Firebase.
-    suspend fun getGames(): List<Game> = withContext(Dispatchers.IO) {
 
-        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-            ?: throw IllegalStateException("Сначала войдите в аккаунт.")
+    // Возвращает общий кэш или загружает каталог один раз.
+    suspend fun getGames(): List<Game> {
+        cachedGames?.let { return it }
 
-        val snapshot = Tasks.await(gamesCollection.get())
+        return gamesMutex.withLock {
+            cachedGames?.let { return@withLock it }
 
-        snapshot.documents.mapNotNull { document ->
-
-            val title = document.getString("title")
-                ?: return@mapNotNull null
-
-            val game = Game(
-                id = document.getLong("id")?.toInt()
-                    ?: document.id.hashCode(),
-                title = title,
-                genre = document.getString("genre")
-                    ?: "Неизвестный жанр",
-                image = document.getString("image") ?: "",
-                description = document.getString("description") ?: "",
-                // Это старое поле больше не определяет лайк пользователя.
-                liked = document.get("liked") as? Boolean ?: false
-            ).apply {
-                firestoreId = document.id
+            loadGamesFromFirestore().also { games ->
+                cachedGames = games
             }
-
-            // У каждой игры своя подколлекция likes.
-            val likesCollection = document.reference.collection("likes")
-            val likesSnapshot = Tasks.await(likesCollection.get())
-
-            game.likesCount = likesSnapshot.size()
-            game.isLikedByCurrentUser =
-                likesSnapshot.documents.any { it.id == currentUid }
-
-            game
         }
+    }
+
+    private suspend fun loadGamesFromFirestore(): List<Game> =
+        withContext(Dispatchers.IO) {
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+                ?: throw IllegalStateException("Сначала войдите в аккаунт.")
+
+            val snapshot = Tasks.await(gamesCollection.get())
+
+            coroutineScope {
+                snapshot.documents.mapNotNull { document ->
+                    val title = document.getString("title")
+                        ?: return@mapNotNull null
+
+                    val game = Game(
+                        id = document.getLong("id")?.toInt()
+                            ?: document.id.hashCode(),
+                        title = title,
+                        genre = document.getString("genre")
+                            ?: "Неизвестный жанр",
+                        image = document.getString("image") ?: "",
+                        description = document.getString("description") ?: "",
+                        liked = document.get("liked") as? Boolean ?: false
+                    ).apply {
+                        firestoreId = document.id
+                    }
+
+                    game to async {
+                        val likesSnapshot = Tasks.await(
+                            document.reference.collection("likes").get()
+                        )
+
+                        game.likesCount = likesSnapshot.size()
+                        game.isLikedByCurrentUser =
+                            likesSnapshot.documents.any { it.id == currentUid }
+                    }
+                }.also { pairs ->
+                    pairs.map { it.second }.awaitAll()
+                }.map { it.first }
+            }
     }
 
 
