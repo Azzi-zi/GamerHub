@@ -1,8 +1,10 @@
+
 package com.example.gamerhub
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 import androidx.room.Ignore
+import androidx.room.PrimaryKey
+
 @Entity(tableName = "games")
 data class Game(
 
@@ -17,10 +19,20 @@ data class Game(
 
     val description: String,
 
+    // Оставляем для совместимости со старым кодом.
+    // Для новых лайков это поле больше не используется.
     var liked: Boolean = false
-){
-    // ID документа в Firestore.
-    // @Ignore сообщает Room, что это поле не нужно сохранять в таблицу.
+
+) {
+    // ID документа игры в Firestore.
     @Ignore
     var firestoreId: String = ""
+
+    // Общее количество лайков игры.
+    @Ignore
+    var likesCount: Int = 0
+
+    // Поставил ли текущий пользователь лайк.
+    @Ignore
+    var isLikedByCurrentUser: Boolean = false
 }

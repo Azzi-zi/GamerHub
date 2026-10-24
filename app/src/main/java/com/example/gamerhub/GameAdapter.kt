@@ -1,18 +1,18 @@
 
 package com.example.gamerhub
 
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class GameAdapter(
     private var games: List<Game>,
@@ -21,7 +21,9 @@ class GameAdapter(
     private val onGameClick: (Game) -> Unit
 ) : RecyclerView.Adapter<GameAdapter.GameViewHolder>() {
 
-    class GameViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class GameViewHolder(itemView: View) :
+        RecyclerView.ViewHolder(itemView) {
+
         val image: ImageView = itemView.findViewById(R.id.game_image)
         val title: TextView = itemView.findViewById(R.id.game_title)
         val genre: TextView = itemView.findViewById(R.id.game_genre)
@@ -64,37 +66,75 @@ class GameAdapter(
 
         holder.title.text = game.title
         holder.genre.text = game.genre
-
-        // Показываем сохранённое состояние лайка
-        holder.likes.text = if (game.liked) "❤️ 1" else "🤍 0"
-
+        showLikes(holder, game)
 
         holder.likes.setOnClickListener {
-            val previousLikedState = game.liked
-            val newLikedState = !previousLikedState
+            if (game.firestoreId.isBlank()) {
+                Toast.makeText(
+                    holder.itemView.context,
+                    "Не найден ID игры в Firebase",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@setOnClickListener
+            }
 
-            // Сразу показываем новое состояние сердечка
-            game.liked = newLikedState
-            holder.likes.text = if (newLikedState) "❤️ 1" else "🤍 0"
+            // Запоминаем состояние, чтобы восстановить его при ошибке.
+            val previousLiked = game.isLikedByCurrentUser
+            val previousCount = game.likesCount
+            val newLiked = !previousLiked
+
+            // Оптимистично обновляем интерфейс.
+            game.isLikedByCurrentUser = newLiked
+            game.likesCount = (previousCount + if (newLiked) 1 else -1)
+                .coerceAtLeast(0)
+
+            showLikes(holder, game)
+            holder.likes.isEnabled = false
 
             lifecycleOwner.lifecycleScope.launch {
                 try {
-                    // Сохраняем лайк в документе игры в Firebase
-                    repository.updateLiked(game.firestoreId, newLikedState)
-
+                    repository.setGameLike(
+                        firestoreId = game.firestoreId,
+                        shouldLike = newLiked
+                    )
                 } catch (e: Exception) {
-                    // Если сохранение не удалось, возвращаем прежнее состояние
-                    game.liked = previousLikedState
-                    holder.likes.text =
-                        if (previousLikedState) "❤️ 1" else "🤍 0"
+                    // Firebase не сохранил изменение — возвращаем прежние данные.
+                    game.isLikedByCurrentUser = previousLiked
+                    game.likesCount = previousCount
+
+                    Log.e(
+                        "GameAdapter",
+                        "Не удалось сохранить лайк игры ${game.title}",
+                        e
+                    )
+
+                    Toast.makeText(
+                        holder.itemView.context,
+                        "Не удалось сохранить лайк: ${e.localizedMessage}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    holder.likes.isEnabled = true
+
+                    // Обновляем карточку, если она всё ещё отображается.
+                    val currentPosition = holder.bindingAdapterPosition
+                    if (currentPosition != RecyclerView.NO_POSITION &&
+                        games.getOrNull(currentPosition) === game
+                    ) {
+                        showLikes(holder, game)
+                    }
                 }
             }
         }
 
-
         holder.itemView.setOnClickListener {
             onGameClick(game)
         }
+    }
+
+    private fun showLikes(holder: GameViewHolder, game: Game) {
+        val heart = if (game.isLikedByCurrentUser) "❤️" else "🤍"
+        holder.likes.text = "$heart ${game.likesCount}"
     }
 
     override fun getItemCount(): Int = games.size

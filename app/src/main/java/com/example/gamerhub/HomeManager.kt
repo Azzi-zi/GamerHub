@@ -133,16 +133,24 @@ class HomeManager(
         }
     }
 
-    // Загружаем игры из основного источника
+
+    // Загружаем игры напрямую из Firestore
+
+    // Загружаем игры вместе с количеством лайков из Firebase.
     private fun loadGames(view: View) {
         activity.lifecycleScope.launch {
             try {
-                val games = withContext(Dispatchers.IO) {
-                    repository.getGames()
-                }
+                val games = repository.getGames()
 
                 showGames(view, games)
 
+                if (games.isEmpty()) {
+                    Toast.makeText(
+                        activity,
+                        "Каталог игр пуст",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             } catch (e: Exception) {
                 android.util.Log.e(
                     "HomeManager",
@@ -150,31 +158,15 @@ class HomeManager(
                     e
                 )
 
-                val localGames = try {
-                    withContext(Dispatchers.IO) {
-                        repository.getLocalGames()
-                    }
-                } catch (localError: Exception) {
-                    android.util.Log.e(
-                        "HomeManager",
-                        "Ошибка загрузки игр из Room",
-                        localError
-                    )
-                    emptyList()
-                }
-
-                showGames(view, localGames)
-
-                if (localGames.isEmpty()) {
-                    Toast.makeText(
-                        activity,
-                        "Не удалось загрузить каталог игр",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                Toast.makeText(
+                    activity,
+                    "Не удалось загрузить каталог игр: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
+
 
     // Показываем игры в сетке из двух колонок
     private fun showGames(
