@@ -17,10 +17,17 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import android.util.Log
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStream
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
+import com.bumptech.glide.Glide
 class ProfileManager(
-    private val view: View,
-    private val repository: GameRepository
+    private val view: View
 ) {
     private val availableRoles = listOf(
         "🎮 Геймер",
@@ -76,67 +83,78 @@ class ProfileManager(
 
         activity.lifecycleScope.launch {
             try {
-                val profile = withContext(Dispatchers.IO) {
-                    // Сначала ищем уже существующий локальный профиль.
-                    val localProfile = repository.getUserProfile(uid)
-
-                    if (localProfile != null) {
-                        localProfile
-                    } else {
-                        // Если его нет, берём имя из регистрации в Firestore.
-                        val document = Tasks.await(
-                            FirebaseFirestore.getInstance()
-                                .collection("users")
-                                .document(uid)
-                                .get()
-                        )
-
-                        val username = document.getString("username")
-                            ?: throw IllegalStateException(
-                                "Имя пользователя не найдено в базе"
-                            )
-
-                        val tag = document.getString("tag")
-                            ?: "@${username.lowercase().replace(" ", "_")}"
-
-                        // Создаём локальный профиль на основе данных регистрации.
-                        val newProfile = UserProfile(
-                            uid = uid,
-                            username = username,
-                            tag = tag,
-                            bio = document.getString("bio") ?: "",
-                            roles = document.getString("roles") ?: "",
-                            avatarUri = document.getString("avatarUri") ?: ""
-                        )
-
-                        repository.saveUserProfile(newProfile)
-                        newProfile
-                    }
+                // Получаем профиль напрямую из Firestore
+                val document = withContext(Dispatchers.IO) {
+                    Tasks.await(
+                        FirebaseFirestore.getInstance()
+                            .collection("users")
+                            .document(uid)
+                            .get()
+                    )
                 }
 
-                view.findViewById<TextView>(R.id.profileUsername).text =
-                    profile.username
+                if (!document.exists()) {
+                    throw IllegalStateException(
+                        "Профиль не найден в Firestore"
+                    )
+                }
 
-                view.findViewById<TextView>(R.id.profileTag).text =
-                    profile.tag
+                val username = document.getString("username")
+                    ?: throw IllegalStateException(
+                        "Имя пользователя не найдено"
+                    )
 
-                view.findViewById<TextView>(R.id.profileBio).text =
-                    profile.bio
+                val tag = document.getString("tag")
+                    ?: "@${username.lowercase().replace(" ", "_")}"
 
-                renderRoles(profile.roles)
+                val bio = document.getString("bio") ?: ""
+                val roles = document.getString("roles") ?: ""
 
-                val avatarView =
-                    view.findViewById<ImageView>(R.id.profileAvatar)
+                // Новый формат — avatarUrl.
+                // Старый avatarUri используем для совместимости.
+                val avatarUrl = document.getString("avatarUrl")
+                    ?: document.getString("avatarUri")
+                    ?: ""
 
-                if (profile.avatarUri.isNotBlank()) {
-                    try {
-                        avatarView.setImageURI(Uri.parse(profile.avatarUri))
-                    } catch (_: Exception) {
-                        // Оставляем стандартный аватар.
-                    }
+                // Обновляем текстовые поля
+                view.findViewById<TextView>(
+                    R.id.profileUsername
+                ).text = username
+
+                view.findViewById<TextView>(
+                    R.id.profileTag
+                ).text = tag
+
+                view.findViewById<TextView>(
+                    R.id.profileBio
+                ).text = bio
+
+                renderRoles(roles)
+
+                // Загружаем аватар по URL
+                val avatarView = view.findViewById<ImageView>(
+                    R.id.profileAvatar
+                )
+
+                if (avatarUrl.startsWith("https://")) {
+                    Glide.with(avatarView)
+                        .load(avatarUrl)
+                        .into(avatarView)
+                } else {
+                    // Если облачного аватара пока нет,
+                    // оставляем изображение по умолчанию.
+                    avatarView.setImageResource(
+                        R.drawable.ic_launcher_foreground
+                    )
                 }
 
             } catch (e: Exception) {
+                android.util.Log.e(
+                    "GamerHubProfile",
+                    "Ошибка загрузки профиля из Firestore",
+                    e
+                )
+
                 Toast.makeText(
                     view.context,
                     "Не удалось загрузить профиль: ${e.localizedMessage}",
@@ -145,31 +163,156 @@ class ProfileManager(
             }
         }
     }
+    private suspend fun uploadAvatarToSupabase(uri: Uri): String =
+        withContext(Dispatchers.IO) {
+
+            val user = FirebaseAuth.getInstance().currentUser
+                ?: throw IllegalStateException("Пользователь не авторизован")
+
+            // Получаем Firebase ID token текущего пользователя
+            val token = Tasks.await(user.getIdToken(false)).token
+                ?: throw IllegalStateException("Не удалось получить токен")
+
+            val resolver = view.context.contentResolver
+            val mimeType = resolver.getType(uri)
+                ?: throw IllegalArgumentException("Не удалось определить формат изображения")
+
+            if (mimeType !in listOf("image/jpeg", "image/png", "image/webp")) {
+                throw IllegalArgumentException(
+                    "Поддерживаются только JPG, PNG и WebP"
+                )
+            }
+
+            val inputStream = resolver.openInputStream(uri)
+                ?: throw IllegalStateException("Не удалось открыть изображение")
+
+            val fileBytes = inputStream.use { it.readBytes() }
+
+            if (fileBytes.size > 5 * 1024 * 1024) {
+                throw IllegalArgumentException("Размер изображения не должен превышать 5 МБ")
+            }
+
+            val extension = when (mimeType) {
+                "image/jpeg" -> "jpg"
+                "image/png" -> "png"
+                "image/webp" -> "webp"
+                else -> throw IllegalArgumentException("Неподдерживаемый формат")
+            }
+
+            val boundary = "----GamerHub${UUID.randomUUID()}"
+            val connection = URL(
+                "https://rewxoagdwwstvuuiqtqc.supabase.co/functions/v1/funk"
+            ).openConnection() as HttpURLConnection
+
+            try {
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 30000
+                connection.doOutput = true
+                connection.setRequestProperty(
+                    "Authorization",
+                    "Bearer $token"
+                )
+                connection.setRequestProperty(
+                    "Content-Type",
+                    "multipart/form-data; boundary=$boundary"
+                )
+
+                connection.outputStream.use { output ->
+                    writeText(output, "--$boundary\r\n")
+                    writeText(
+                        output,
+                        "Content-Disposition: form-data; name=\"file\"; filename=\"avatar.$extension\"\r\n"
+                    )
+                    writeText(output, "Content-Type: $mimeType\r\n\r\n")
+                    output.write(fileBytes)
+                    writeText(output, "\r\n--$boundary--\r\n")
+                }
+
+                val responseCode = connection.responseCode
+                val responseStream = if (responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+                val response = responseStream?.bufferedReader()?.use {
+                    it.readText()
+                }.orEmpty()
+
+                if (responseCode !in 200..299) {
+                    throw IllegalStateException(
+                        "Ошибка загрузки ($responseCode): $response"
+                    )
+                }
+
+                val json = JSONObject(response)
+                json.getString("url")
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    private fun writeText(output: OutputStream, text: String) {
+        output.write(text.toByteArray(Charsets.UTF_8))
+    }
+
 
 
     private fun saveAvatar(uri: Uri) {
         val activity = view.context as MainActivity
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val user = FirebaseAuth.getInstance().currentUser
+
+        if (user == null) {
+            Toast.makeText(
+                view.context,
+                "Сначала войди в аккаунт",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
 
         activity.lifecycleScope.launch {
             try {
-                // Сохраняем адрес фотографии в Room
-                withContext(Dispatchers.IO) {
-                    val oldProfile = repository.getUserProfile(uid)
-                        ?: UserProfile(uid = uid)
+                // Получаем ссылку на загруженный аватар
+                val avatarUrl = uploadAvatarToSupabase(uri)
 
-                    repository.saveUserProfile(
-                        oldProfile.copy(
-                            avatarUri = uri.toString()
-                        )
+                // Сохраняем ссылку в Firestore
+                withContext(Dispatchers.IO) {
+                    val db = FirebaseFirestore.getInstance()
+                    val batch = db.batch()
+
+                    val avatarData = mapOf(
+                        "avatarUrl" to avatarUrl,
+                        "updatedAt" to
+                                com.google.firebase.firestore.FieldValue.serverTimestamp()
                     )
+
+                    batch.set(
+                        db.collection("users").document(user.uid),
+                        avatarData,
+                        SetOptions.merge()
+                    )
+
+                    batch.set(
+                        db.collection("publicProfiles").document(user.uid),
+                        mapOf("avatarUrl" to avatarUrl),
+                        SetOptions.merge()
+                    )
+
+                    Tasks.await(batch.commit())
                 }
 
-                // Сразу показываем выбранную фотографию
+                // Обновляем аватар на экране
                 val avatarView = view.findViewById<ImageView>(
                     R.id.profileAvatar
                 )
-                avatarView.setImageURI(uri)
+
+                Glide.with(avatarView)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .into(avatarView)
 
                 Toast.makeText(
                     view.context,
@@ -178,14 +321,21 @@ class ProfileManager(
                 ).show()
 
             } catch (e: Exception) {
+                Log.e(
+                    "GamerHubProfile",
+                    "Ошибка загрузки аватара",
+                    e
+                )
+
                 Toast.makeText(
                     view.context,
-                    "Не удалось сохранить аватар",
-                    Toast.LENGTH_SHORT
+                    "Не удалось загрузить аватар: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
                 ).show()
             }
         }
     }
+
     fun setup() {
         loadProfile()
 
@@ -584,53 +734,42 @@ class ProfileManager(
 
                     try {
                         withContext(Dispatchers.IO) {
-                            val oldProfile = repository.getUserProfile(uid)
-
-                            // Сохраняем профиль на устройстве в Room
-                            repository.saveUserProfile(
-                                UserProfile(
-                                    uid = uid,
-                                    username = username,
-                                    tag = normalizedTag,
-                                    bio = bio,
-                                    roles = selectedRoles,
-                                    avatarUri = oldProfile?.avatarUri ?: ""
-                                )
-                            )
-
-                            // Подготавливаем обновлённые данные для Firebase
                             val db = FirebaseFirestore.getInstance()
                             val batch = db.batch()
 
+                            // Данные приватного профиля
                             val privateProfile = hashMapOf(
                                 "uid" to uid,
                                 "username" to username,
                                 "tag" to normalizedTag,
                                 "bio" to bio,
                                 "roles" to selectedRoles,
-                                "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                "updatedAt" to
+                                        com.google.firebase.firestore.FieldValue.serverTimestamp()
                             )
 
+                            // Данные для поиска пользователей
                             val publicProfile = hashMapOf(
                                 "uid" to uid,
                                 "username" to username,
                                 "tag" to normalizedTag
                             )
 
-                            // Обновляем оба документа, не удаляя остальные поля
+                            // Сохраняем приватный профиль
                             batch.set(
                                 db.collection("users").document(uid),
                                 privateProfile,
                                 SetOptions.merge()
                             )
 
+                            // Сохраняем публичный профиль
                             batch.set(
                                 db.collection("publicProfiles").document(uid),
                                 publicProfile,
                                 SetOptions.merge()
                             )
 
-                            // Ждём завершения записи в Firebase
+                            // Ждём завершения сохранения
                             Tasks.await(batch.commit())
                         }
 

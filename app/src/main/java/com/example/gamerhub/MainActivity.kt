@@ -252,7 +252,7 @@ class MainActivity : AppCompatActivity() {
             openPage(R.layout.screen_profile)
 
             val profileView = pageContainer.getChildAt(0)
-            ProfileManager(profileView, repository).setup()
+            ProfileManager(profileView).setup()
 
             setActiveNav(navProfile)
         }
