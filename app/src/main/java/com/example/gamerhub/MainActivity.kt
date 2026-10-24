@@ -1,6 +1,10 @@
 
 package com.example.gamerhub
 
+import androidx.lifecycle.lifecycleScope
+
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -210,9 +214,25 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        setupBottomNavigation()
-        openHomePage()
 
+        setupBottomNavigation()
+
+// Автоматически добавляем недостающие игры в Firebase.
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.loadInitialGames()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "MainActivity",
+                    "Ошибка заполнения каталога игр",
+                    e
+                )
+            }
+        }
+
+        openHomePage()
         setActiveNav(findViewById(R.id.navHome))
     }
 
