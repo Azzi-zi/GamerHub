@@ -184,19 +184,23 @@ class PostDetailsManager(
             myLike.get()
                 .addOnSuccessListener { document ->
 
+
                     val operation = if (document.exists()) {
-                        // Лайк уже есть — убираем его
+                        // Снимаем лайк — уведомление не создаём
                         myLike.delete()
                     } else {
-                        // Лайка нет — создаём документ
+                        // Сначала сохраняем лайк
                         myLike.set(
                             mapOf(
                                 "uid" to uid,
-                                "createdAt" to
-                                        FieldValue.serverTimestamp()
+                                "createdAt" to FieldValue.serverTimestamp()
                             )
-                        )
+                        ).addOnSuccessListener {
+                            // Уведомление создаём только после успешного сохранения лайка
+                            createLikeNotification(uid)
+                        }
                     }
+
 
                     operation
                         .addOnFailureListener {
@@ -223,6 +227,42 @@ class PostDetailsManager(
                 }
         }
     }
+
+    private fun createLikeNotification(actorUid: String) {
+        // Не уведомляем автора о его собственном лайке
+        if (post.authorId.isBlank() || post.authorId == actorUid) {
+            return
+        }
+
+        val actorName = FirebaseAuth.getInstance()
+            .currentUser?.displayName
+            ?.takeIf { it.isNotBlank() }
+            ?: "Игрок"
+
+        val notification = hashMapOf(
+            "type" to "like",
+            "actorId" to actorUid,
+            "actorName" to actorName,
+            "recipientId" to post.authorId,
+            "postId" to post.id,
+            "postTitle" to post.title,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "read" to false
+        )
+
+        db.collection("users")
+            .document(post.authorId)
+            .collection("notifications")
+            .add(notification)
+            .addOnFailureListener {
+                Toast.makeText(
+                    activity,
+                    "Не удалось создать уведомление о лайке",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+    }
+
 
     // Отключаем слушатель при закрытии страницы
     fun cleanup() {

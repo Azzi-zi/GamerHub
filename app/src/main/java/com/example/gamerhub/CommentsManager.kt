@@ -145,6 +145,13 @@ class CommentsManager(
             comments.add(comment)
                 .addOnSuccessListener {
                     input.text.clear()
+
+                    createCommentNotification(
+                        actorUid = currentUser.uid,
+                        actorName = authorName,
+                        commentText = commentText
+                    )
+
                     Toast.makeText(
                         activity,
                         "Комментарий опубликован",
@@ -168,6 +175,61 @@ class CommentsManager(
                     sendButton.isEnabled = true
                 }
         }
+    }
+    private fun createCommentNotification(
+        actorUid: String,
+        actorName: String,
+        commentText: String
+    ) {
+        // Получаем данные публикации
+        db.collection("posts")
+            .document(postId)
+            .get()
+            .addOnSuccessListener { postDocument ->
+
+                if (!postDocument.exists()) return@addOnSuccessListener
+
+                val postAuthorId = postDocument.getString("authorId")
+                    ?: return@addOnSuccessListener
+
+                // Не уведомляем пользователя о собственном комментарии
+                if (postAuthorId.isBlank() || postAuthorId == actorUid) {
+                    return@addOnSuccessListener
+                }
+
+                val postTitle = postDocument.getString("title").orEmpty()
+
+                val notification = hashMapOf(
+                    "type" to "comment",
+                    "actorId" to actorUid,
+                    "actorName" to actorName,
+                    "recipientId" to postAuthorId,
+                    "postId" to postId,
+                    "postTitle" to postTitle,
+                    "commentText" to commentText,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "read" to false
+                )
+
+                db.collection("users")
+                    .document(postAuthorId)
+                    .collection("notifications")
+                    .add(notification)
+                    .addOnFailureListener { error ->
+                        android.util.Log.e(
+                            "CommentsManager",
+                            "Не удалось создать уведомление",
+                            error
+                        )
+                    }
+            }
+            .addOnFailureListener { error ->
+                android.util.Log.e(
+                    "CommentsManager",
+                    "Не удалось загрузить публикацию",
+                    error
+                )
+            }
     }
 
     private fun createCommentView(

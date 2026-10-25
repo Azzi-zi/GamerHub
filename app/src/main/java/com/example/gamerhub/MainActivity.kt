@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var notificationsManager: NotificationsManager
 
     private lateinit var pageContainer: FrameLayout
     private lateinit var homeManager: HomeManager
@@ -162,6 +163,7 @@ class MainActivity : AppCompatActivity() {
 
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+        notificationsManager = NotificationsManager()
 
         pageContainer = findViewById(R.id.pageContainer)
 
@@ -184,6 +186,9 @@ class MainActivity : AppCompatActivity() {
             postsManager = postsManager,
             onGameClick = { game ->
                 openGameDetails(game)
+            },
+            onNotificationsClick = {
+                openPage(R.layout.screen_notifications)
             }
         )
 
@@ -306,6 +311,10 @@ class MainActivity : AppCompatActivity() {
         // Настройка экрана создания публикации
         if (layoutId == R.layout.screen_create) {
             createPostManager.setup(view)
+        }
+
+        if (layoutId == R.layout.screen_notifications) {
+            notificationsManager.setup(view)
         }
     }
 

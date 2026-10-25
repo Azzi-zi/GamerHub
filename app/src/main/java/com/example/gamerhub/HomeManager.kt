@@ -21,7 +21,8 @@ class HomeManager(
     private val activity: AppCompatActivity,
     private val repository: GameRepository,
     private val postsManager: PostsManager,
-    private val onGameClick: (Game) -> Unit
+    private val onGameClick: (Game) -> Unit,
+    private val onNotificationsClick: () -> Unit
 ) {
     // Кэш каталога, чтобы не загружать игры при каждом переходе.
     private var cachedGames: List<Game>? = null
@@ -32,8 +33,16 @@ class HomeManager(
     // Настраиваем главную страницу
     fun setup(view: View) {
         setupHomeLogo(view)
+        setupNotificationsButton(view)
         setupHomeCategories(view)
         loadGames(view)
+    }
+
+    // Открываем уведомления при нажатии на колокольчик
+    private fun setupNotificationsButton(view: View) {
+        view.findViewById<View>(R.id.notifications)?.setOnClickListener {
+            onNotificationsClick()
+        }
     }
 
     // Оформляем логотип
