@@ -7,12 +7,14 @@
     android:background="#121216">
 
     <ScrollView
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"
         android:clipToPadding="false"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -24,7 +26,6 @@
             android:paddingBottom="30dp">
 
             <!-- Заголовок профиля -->
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -55,7 +56,6 @@
             </LinearLayout>
 
             <!-- Аватар и информация -->
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -126,7 +126,6 @@
                         android:textColor="#888892"
                         android:textSize="12sp" />
 
-
                     <HorizontalScrollView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -159,7 +158,6 @@
             </LinearLayout>
 
             <!-- Описание профиля -->
-
             <TextView
                 android:id="@+id/profileBio"
                 android:layout_width="match_parent"
@@ -171,7 +169,6 @@
                 android:lineSpacingExtra="4dp" />
 
             <!-- Статистика -->
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="90dp"
@@ -271,7 +268,6 @@
             </LinearLayout>
 
             <!-- Редактирование профиля -->
-
             <Button
                 android:id="@+id/editProfileButton"
                 android:layout_width="match_parent"
@@ -284,7 +280,6 @@
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
-
             <Button
                 android:id="@+id/logoutButton"
                 android:layout_width="match_parent"
@@ -296,9 +291,7 @@
                 android:textColor="#FFFFFF"
                 android:textSize="14sp" />
 
-
             <!-- Вкладки -->
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="55dp"
@@ -335,36 +328,49 @@
 
             <!-- Публикации пользователя -->
 
-
-            <LinearLayout
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_search"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
 
-                <TextView
-                    android:id="@+id/profilePostsEmpty"
+                <LinearLayout
+                    android:id="@+id/profilePostsContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:text="📝"
-                    android:textColor="#FFFFFF"
-                    android:textSize="32sp" />
+                    android:orientation="vertical" />
 
-                <TextView
-                    android:id="@+id/profileEmptyMessage"
+                <LinearLayout
+                    android:id="@+id/profileEmptyContainer"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_height="180dp"
+                    android:background="@drawable/bg_search"
                     android:gravity="center"
-                    android:text="У тебя пока нет публикаций"
-                    android:textColor="#AAAAAA"
-                    android:textSize="14sp" />
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:visibility="gone">
 
-            </LinearLayout>
+                    <TextView
+                        android:id="@+id/profilePostsEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="📝"
+                        android:textColor="#FFFFFF"
+                        android:textSize="32sp" />
+
+                    <TextView
+                        android:id="@+id/profileEmptyMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:text="У тебя пока нет публикаций"
+                        android:textColor="#AAAAAA"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+            </FrameLayout>
 
 
         </LinearLayout>

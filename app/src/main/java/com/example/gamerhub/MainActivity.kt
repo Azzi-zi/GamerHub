@@ -267,14 +267,22 @@ class MainActivity : AppCompatActivity() {
             setActiveNav(navChats)
         }
 
+
         navProfile.setOnClickListener {
             openPage(R.layout.screen_profile)
 
             val profileView = pageContainer.getChildAt(0)
             ProfileManager(profileView).setup()
 
+            val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+            if (userId != null) {
+                postsManager.loadUserPosts(profileView, userId)
+            }
+
             setActiveNav(navProfile)
         }
+
     }
 
     // ============================================================

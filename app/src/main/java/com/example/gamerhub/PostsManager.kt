@@ -149,6 +149,73 @@ class PostsManager(
         }
     }
 
+
+    // Загружаем публикации конкретного пользователя в его профиль
+
+    fun loadUserPosts(view: View, userId: String) {
+        val container = view.findViewById<LinearLayout>(
+            R.id.profilePostsContainer
+        ) ?: return
+
+        val emptyContainer = view.findViewById<View>(
+            R.id.profileEmptyContainer
+        )
+
+        activity.lifecycleScope.launch {
+            try {
+                val snapshot = db.collection("posts")
+                    .whereEqualTo("authorId", userId)
+                    .get()
+                    .await()
+
+                val posts = snapshot.documents
+                    .mapNotNull { document ->
+                        document.toObject(Post::class.java)
+                            ?.copy(id = document.id)
+                    }
+                    .reversed()
+
+                container.removeAllViews()
+
+                android.util.Log.d(
+                    "PostsManager",
+                    "Публикаций найдено: ${posts.size}"
+                )
+
+                if (posts.isEmpty()) {
+                    emptyContainer?.visibility = View.VISIBLE
+                } else {
+                    emptyContainer?.visibility = View.GONE
+
+                    posts.forEach { post ->
+                        // Используем ту же карточку, что и в общей ленте.
+                        container.addView(createPostCard(post))
+                    }
+                }
+
+                view.findViewById<TextView>(
+                    R.id.profilePostsCount
+                )?.text = posts.size.toString()
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "PostsManager",
+                    "Ошибка загрузки публикаций профиля",
+                    e
+                )
+
+                Toast.makeText(
+                    activity,
+                    "Не удалось загрузить публикации",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    fun createProfilePostCard(post: Post): View {
+        return createPostCard(post)
+    }
     // Создаём карточку публикации
     private fun createPostCard(post: Post): View {
         val card = LinearLayout(activity).apply {

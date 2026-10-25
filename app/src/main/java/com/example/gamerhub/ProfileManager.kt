@@ -1,34 +1,56 @@
 package com.example.gamerhub
 
-import com.google.android.gms.tasks.Tasks
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
-import android.net.Uri
-import android.widget.ImageView
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.util.Log
+import android.view.Gravity
 import android.view.View
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.util.Log
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
-import com.bumptech.glide.Glide
+
 class ProfileManager(
     private val view: View
 ) {
+
+    private val activity: MainActivity
+        get() = view.context as MainActivity
+
+    private val db: FirebaseFirestore
+        get() = FirebaseFirestore.getInstance()
+
+    private val auth: FirebaseAuth
+        get() = FirebaseAuth.getInstance()
+
+    private val purple = android.graphics.Color.rgb(155, 122, 255)
+    private val white = android.graphics.Color.WHITE
+    private val gray = android.graphics.Color.rgb(136, 136, 146)
+    private val lightGray = android.graphics.Color.rgb(170, 170, 170)
+    private val dark = android.graphics.Color.rgb(26, 26, 32)
+
     private val availableRoles = listOf(
         "🎮 Геймер",
         "📚 Лоровед",
@@ -39,84 +61,39 @@ class ProfileManager(
         "🧪 Тестировщик",
         "🎵 Музыкант"
     )
-    private fun renderRoles(rolesString: String) {
-        val container = view.findViewById<android.widget.LinearLayout>(
-            R.id.profileRolesContainer
-        )
 
-        // Удаляем старые роли перед отображением новых
-        container.removeAllViews()
-
-        // Преобразуем строку из базы в список ролей
-
-        val roles = rolesString
-            .split('|')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-
-
-        for (role in roles) {
-            val roleView = TextView(view.context).apply {
-                text = role
-                textSize = 12f
-                setTextColor(android.graphics.Color.WHITE)
-                setPadding(32, 16, 32, 16)
-                setBackgroundResource(R.drawable.bg_category_active)
-            }
-
-            val params = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-            params.marginEnd = 16
-            container.addView(roleView, params)
-        }
+    // Главная точка запуска менеджера профиля.
+    fun setup() {
+        loadProfile()
+        loadProfileLikes()
+        setupProfileActions()
+        setupTabs()
     }
 
-    // Загружаем профиль текущего пользователя
-
+    // Загружает данные пользователя из Firestore.
     private fun loadProfile() {
-        val activity = view.context as MainActivity
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        val uid = user.uid
+        val user = auth.currentUser ?: return
 
         activity.lifecycleScope.launch {
             try {
-                // Получаем профиль напрямую из Firestore
                 val document = withContext(Dispatchers.IO) {
                     Tasks.await(
-                        FirebaseFirestore.getInstance()
-                            .collection("users")
-                            .document(uid)
+                        db.collection("users")
+                            .document(user.uid)
                             .get()
                     )
                 }
 
-                if (!document.exists()) {
-                    throw IllegalStateException(
-                        "Профиль не найден в Firestore"
-                    )
+                check(document.exists()) {
+                    "Профиль не найден в Firestore"
                 }
 
                 val username = document.getString("username")
-                    ?: throw IllegalStateException(
-                        "Имя пользователя не найдено"
-                    )
+                    ?: error("Имя пользователя не найдено")
 
                 val tag = document.getString("tag")
                     ?: "@${username.lowercase().replace(" ", "_")}"
 
-                val bio = document.getString("bio") ?: ""
-                val roles = document.getString("roles") ?: ""
-
-                // Новый формат — avatarUrl.
-                // Старый avatarUri используем для совместимости.
-                val avatarUrl = document.getString("avatarUrl")
-                    ?: document.getString("avatarUri")
-                    ?: ""
-
-                // Обновляем текстовые поля
                 view.findViewById<TextView>(
                     R.id.profileUsername
                 ).text = username
@@ -127,266 +104,152 @@ class ProfileManager(
 
                 view.findViewById<TextView>(
                     R.id.profileBio
-                ).text = bio
+                ).text = document.getString("bio").orEmpty()
 
-                renderRoles(roles)
-
-                // Загружаем аватар по URL
-                val avatarView = view.findViewById<ImageView>(
-                    R.id.profileAvatar
+                renderRoles(
+                    document.getString("roles").orEmpty()
                 )
 
-                if (avatarUrl.startsWith("https://")) {
-                    Glide.with(avatarView)
-                        .load(avatarUrl)
-                        .into(avatarView)
-                } else {
-                    // Если облачного аватара пока нет,
-                    // оставляем изображение по умолчанию.
-                    avatarView.setImageResource(
-                        R.drawable.ic_launcher_foreground
-                    )
-                }
+                val avatarUrl = document.getString("avatarUrl")
+                    ?: document.getString("avatarUri")
+                    ?: ""
+
+                showAvatar(avatarUrl)
 
             } catch (e: Exception) {
-                android.util.Log.e(
-                    "GamerHubProfile",
-                    "Ошибка загрузки профиля из Firestore",
-                    e
-                )
+                Log.e(TAG, "Ошибка загрузки профиля", e)
 
-                Toast.makeText(
-                    view.context,
-                    "Не удалось загрузить профиль: ${e.localizedMessage}",
-                    Toast.LENGTH_LONG
-                ).show()
+                showToast(
+                    "Не удалось загрузить профиль: ${e.localizedMessage}"
+                )
             }
         }
     }
-    private suspend fun uploadAvatarToSupabase(uri: Uri): String =
-        withContext(Dispatchers.IO) {
 
-            val user = FirebaseAuth.getInstance().currentUser
-                ?: throw IllegalStateException("Пользователь не авторизован")
+    // Показывает аватар пользователя.
+    private fun showAvatar(url: String) {
+        val avatar = view.findViewById<ImageView>(
+            R.id.profileAvatar
+        )
 
-            // Получаем Firebase ID token текущего пользователя
-            val token = Tasks.await(user.getIdToken(false)).token
-                ?: throw IllegalStateException("Не удалось получить токен")
-
-            val resolver = view.context.contentResolver
-            val mimeType = resolver.getType(uri)
-                ?: throw IllegalArgumentException("Не удалось определить формат изображения")
-
-            if (mimeType !in listOf("image/jpeg", "image/png", "image/webp")) {
-                throw IllegalArgumentException(
-                    "Поддерживаются только JPG, PNG и WebP"
-                )
-            }
-
-            val inputStream = resolver.openInputStream(uri)
-                ?: throw IllegalStateException("Не удалось открыть изображение")
-
-            val fileBytes = inputStream.use { it.readBytes() }
-
-            if (fileBytes.size > 5 * 1024 * 1024) {
-                throw IllegalArgumentException("Размер изображения не должен превышать 5 МБ")
-            }
-
-            val extension = when (mimeType) {
-                "image/jpeg" -> "jpg"
-                "image/png" -> "png"
-                "image/webp" -> "webp"
-                else -> throw IllegalArgumentException("Неподдерживаемый формат")
-            }
-
-            val boundary = "----GamerHub${UUID.randomUUID()}"
-            val connection = URL(
-                "https://rewxoagdwwstvuuiqtqc.supabase.co/functions/v1/funk"
-            ).openConnection() as HttpURLConnection
-
-            try {
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 15000
-                connection.readTimeout = 30000
-                connection.doOutput = true
-                connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer $token"
-                )
-                connection.setRequestProperty(
-                    "Content-Type",
-                    "multipart/form-data; boundary=$boundary"
-                )
-
-                connection.outputStream.use { output ->
-                    writeText(output, "--$boundary\r\n")
-                    writeText(
-                        output,
-                        "Content-Disposition: form-data; name=\"file\"; filename=\"avatar.$extension\"\r\n"
-                    )
-                    writeText(output, "Content-Type: $mimeType\r\n\r\n")
-                    output.write(fileBytes)
-                    writeText(output, "\r\n--$boundary--\r\n")
-                }
-
-                val responseCode = connection.responseCode
-                val responseStream = if (responseCode in 200..299) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                }
-
-                val response = responseStream?.bufferedReader()?.use {
-                    it.readText()
-                }.orEmpty()
-
-                if (responseCode !in 200..299) {
-                    throw IllegalStateException(
-                        "Ошибка загрузки ($responseCode): $response"
-                    )
-                }
-
-                val json = JSONObject(response)
-                json.getString("url")
-            } finally {
-                connection.disconnect()
-            }
+        if (url.startsWith("https://")) {
+            Glide.with(avatar)
+                .load(url)
+                .placeholder(R.drawable.ic_launcher_foreground)
+                .error(R.drawable.ic_launcher_foreground)
+                .into(avatar)
+        } else {
+            avatar.setImageResource(
+                R.drawable.ic_launcher_foreground
+            )
         }
-
-    private fun writeText(output: OutputStream, text: String) {
-        output.write(text.toByteArray(Charsets.UTF_8))
     }
 
+    // Отображает роли пользователя.
+    // В Firestore роли хранятся в строке через символ |.
+    private fun renderRoles(rolesString: String) {
+        val container = view.findViewById<LinearLayout>(
+            R.id.profileRolesContainer
+        )
 
+        container.removeAllViews()
 
-    private fun saveAvatar(uri: Uri) {
-        val activity = view.context as MainActivity
-        val user = FirebaseAuth.getInstance().currentUser
+        rolesString.split('|')
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .forEach { role ->
 
-        if (user == null) {
-            Toast.makeText(
-                view.context,
-                "Сначала войди в аккаунт",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
+                val roleView = TextView(view.context).apply {
+                    text = role
+                    textSize = 12f
+                    setTextColor(white)
+                    setPadding(32, 16, 32, 16)
+                    setBackgroundResource(
+                        R.drawable.bg_category_active
+                    )
+                }
+
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = 16
+                }
+
+                container.addView(roleView, params)
+            }
+    }
+
+    // Считает лайки всех публикаций текущего пользователя.
+    private fun loadProfileLikes() {
+        val uid = auth.currentUser?.uid ?: return
 
         activity.lifecycleScope.launch {
             try {
-                // Получаем ссылку на загруженный аватар
-                val avatarUrl = uploadAvatarToSupabase(uri)
-
-                // Сохраняем ссылку в Firestore
-                withContext(Dispatchers.IO) {
-                    val db = FirebaseFirestore.getInstance()
-                    val batch = db.batch()
-
-                    val avatarData = mapOf(
-                        "avatarUrl" to avatarUrl,
-                        "updatedAt" to
-                                com.google.firebase.firestore.FieldValue.serverTimestamp()
+                val totalLikes = withContext(Dispatchers.IO) {
+                    val posts = Tasks.await(
+                        db.collection("posts")
+                            .whereEqualTo("authorId", uid)
+                            .get()
                     )
 
-                    batch.set(
-                        db.collection("users").document(user.uid),
-                        avatarData,
-                        SetOptions.merge()
-                    )
+                    var total = 0
 
-                    batch.set(
-                        db.collection("publicProfiles").document(user.uid),
-                        mapOf("avatarUrl" to avatarUrl),
-                        SetOptions.merge()
-                    )
+                    for (post in posts.documents) {
+                        val likes = Tasks.await(
+                            db.collection("posts")
+                                .document(post.id)
+                                .collection("likes")
+                                .get()
+                        )
 
-                    Tasks.await(batch.commit())
+                        total += likes.size()
+                    }
+
+                    total
                 }
 
-                // Обновляем аватар на экране
-                val avatarView = view.findViewById<ImageView>(
-                    R.id.profileAvatar
-                )
-
-                Glide.with(avatarView)
-                    .load(avatarUrl)
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
-                    .into(avatarView)
-
-                Toast.makeText(
-                    view.context,
-                    "Аватар обновлён",
-                    Toast.LENGTH_SHORT
-                ).show()
+                view.findViewById<TextView>(
+                    R.id.profileLikesCount
+                ).text = totalLikes.toString()
 
             } catch (e: Exception) {
-                Log.e(
-                    "GamerHubProfile",
-                    "Ошибка загрузки аватара",
-                    e
-                )
-
-                Toast.makeText(
-                    view.context,
-                    "Не удалось загрузить аватар: ${e.localizedMessage}",
-                    Toast.LENGTH_LONG
-                ).show()
+                Log.e(TAG, "Ошибка подсчёта лайков", e)
             }
         }
     }
 
-    fun setup() {
-        loadProfile()
+    // Настраивает кнопки профиля.
+    private fun setupProfileActions() {
 
-        // Кнопка с гаечным ключом открывает настройки
-        val settingsButton = view.findViewById<View>(
+        view.findViewById<View>(
             R.id.profileSettings
-        )
-
-        settingsButton.setOnClickListener {
+        ).setOnClickListener {
             showSettingsDialog()
         }
 
-
-        // Нажатие на аватарку открывает галерею
-        val avatarContainer = view.findViewById<View>(
+        view.findViewById<View>(
             R.id.profileAvatarContainer
-        )
-
-        avatarContainer.setOnClickListener {
-            val activity = view.context as MainActivity
-
+        ).setOnClickListener {
             activity.openAvatarPicker { uri ->
                 saveAvatar(uri)
             }
         }
 
-
-
-        // Кнопка редактирования профиля
-        val editButton =
-            view.findViewById<View>(R.id.editProfileButton)
-
-        editButton.setOnClickListener {
+        view.findViewById<View>(
+            R.id.editProfileButton
+        ).setOnClickListener {
             showEditDialog()
         }
 
-        // Отображаем почту текущего пользователя
-        val emailView =
-            view.findViewById<TextView>(R.id.profileEmail)
+        view.findViewById<TextView>(
+            R.id.profileEmail
+        ).text = auth.currentUser?.email ?: "Аккаунт не найден"
 
-        val currentUser = FirebaseAuth.getInstance().currentUser
-        emailView.text = currentUser?.email ?: "Аккаунт не найден"
-
-        // Кнопка выхода из аккаунта
-        val logoutButton =
-            view.findViewById<View>(R.id.logoutButton)
-
-        logoutButton.setOnClickListener {
-            val activity = view.context as MainActivity
-
-            FirebaseAuth.getInstance().signOut()
+        view.findViewById<View>(
+            R.id.logoutButton
+        ).setOnClickListener {
+            auth.signOut()
 
             activity.startActivity(
                 Intent(activity, LoginActivity::class.java)
@@ -394,47 +257,72 @@ class ProfileManager(
 
             activity.finish()
         }
+    }
 
-        // Вкладки публикаций и сохранённого
-        val postsTab =
-            view.findViewById<TextView>(R.id.profilePostsTab)
+    // Настраивает переключение вкладок публикаций и сохранённого.
+    private fun setupTabs() {
+        val postsContainer = view.findViewById<LinearLayout>(
+            R.id.profilePostsContainer
+        )
 
-        val savedTab =
-            view.findViewById<TextView>(R.id.profileSavedTab)
+        val emptyContainer = view.findViewById<View>(
+            R.id.profileEmptyContainer
+        )
 
-        val emptyMessage =
-            view.findViewById<TextView>(R.id.profileEmptyMessage)
+        val postsTab = view.findViewById<TextView>(
+            R.id.profilePostsTab
+        )
 
-        val emptyIcon =
-            view.findViewById<TextView>(R.id.profilePostsEmpty)
+        val savedTab = view.findViewById<TextView>(
+            R.id.profileSavedTab
+        )
+
+        val emptyMessage = view.findViewById<TextView>(
+            R.id.profileEmptyMessage
+        )
+
+        val emptyIcon = view.findViewById<TextView>(
+            R.id.profilePostsEmpty
+        )
 
         fun selectTab(showPosts: Boolean) {
+            postsTab.setTextColor(
+                if (showPosts) purple else gray
+            )
+
+            savedTab.setTextColor(
+                if (showPosts) gray else purple
+            )
+
+            postsTab.setTypeface(
+                null,
+                if (showPosts) Typeface.BOLD else Typeface.NORMAL
+            )
+
+            savedTab.setTypeface(
+                null,
+                if (showPosts) Typeface.NORMAL else Typeface.BOLD
+            )
+
             if (showPosts) {
-                postsTab.setTextColor(
-                    android.graphics.Color.rgb(155, 122, 255)
-                )
-                savedTab.setTextColor(
-                    android.graphics.Color.rgb(136, 136, 146)
-                )
-
-                postsTab.setTypeface(null, Typeface.BOLD)
-                savedTab.setTypeface(null, Typeface.NORMAL)
-
                 emptyIcon.text = "📝"
                 emptyMessage.text = "У тебя пока нет публикаций"
+
+                postsContainer.visibility = View.VISIBLE
+
+                emptyContainer.visibility =
+                    if (postsContainer.childCount == 0) {
+                        View.VISIBLE
+                    } else {
+                        View.GONE
+                    }
+
             } else {
-                savedTab.setTextColor(
-                    android.graphics.Color.rgb(155, 122, 255)
-                )
-                postsTab.setTextColor(
-                    android.graphics.Color.rgb(136, 136, 146)
-                )
-
-                savedTab.setTypeface(null, Typeface.BOLD)
-                postsTab.setTypeface(null, Typeface.NORMAL)
-
                 emptyIcon.text = "🔖"
                 emptyMessage.text = "Здесь пока ничего нет"
+
+                postsContainer.visibility = View.GONE
+                emptyContainer.visibility = View.VISIBLE
             }
         }
 
@@ -446,69 +334,183 @@ class ProfileManager(
             selectTab(false)
         }
 
-        // По умолчанию открываем публикации
         selectTab(true)
     }
 
+    // Загружает изображение в Supabase и возвращает публичный URL.
+    private suspend fun uploadAvatarToSupabase(
+        uri: Uri
+    ): String = withContext(Dispatchers.IO) {
 
-    private fun styleDialog(dialog: AlertDialog) {
-        val purple = android.graphics.Color.rgb(155, 122, 255)
-        val white = android.graphics.Color.WHITE
-        val gray = android.graphics.Color.rgb(170, 170, 170)
-        val dark = android.graphics.Color.rgb(26, 26, 32)
+        val user = auth.currentUser
+            ?: error("Пользователь не авторизован")
 
-        // Делаем заголовок белым
-        val titleId = view.resources.getIdentifier(
-            "alertTitle",
-            "id",
-            "android"
-        )
+        val token = Tasks.await(
+            user.getIdToken(false)
+        ).token ?: error("Не удалось получить токен")
 
-        if (titleId != 0) {
-            dialog.findViewById<TextView>(titleId)
-                ?.setTextColor(android.graphics.Color.WHITE)
-        }
-        // Скруглённый тёмный фон
-        val background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(dark)
-            cornerRadius = 20 * view.resources.displayMetrics.density
-        }
+        val resolver = view.context.contentResolver
 
-        dialog.window?.setBackgroundDrawable(background)
+        val mimeType = resolver.getType(uri)
+            ?: error("Не удалось определить формат изображения")
 
+        val extension = when (mimeType) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/webp" -> "webp"
 
-
-        // Текст сообщения, если он есть
-        dialog.findViewById<TextView>(android.R.id.message)
-            ?.setTextColor(gray)
-
-        // Список пунктов, например в окне настроек
-        dialog.listView?.let { list ->
-            list.setBackgroundColor(dark)
-            list.divider = android.graphics.drawable.ColorDrawable(
-                android.graphics.Color.rgb(48, 48, 57)
+            else -> throw IllegalArgumentException(
+                "Поддерживаются только JPG, PNG и WebP"
             )
-            list.dividerHeight = 1
-
-            // Перекрашиваем видимые пункты списка
-            for (i in 0 until list.childCount) {
-                (list.getChildAt(i) as? TextView)?.setTextColor(white)
-            }
         }
 
-        // Кнопки
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            ?.setTextColor(purple)
+        val inputStream = resolver.openInputStream(uri)
+            ?: error("Не удалось открыть изображение")
 
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-            ?.setTextColor(purple)
+        val fileBytes = inputStream.use {
+            it.readBytes()
+        }
 
-        dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
-            ?.setTextColor(purple)
+        require(fileBytes.size <= MAX_AVATAR_SIZE) {
+            "Размер изображения не должен превышать 5 МБ"
+        }
+
+        val boundary = "----GamerHub${UUID.randomUUID()}"
+
+        val connection = URL(SUPABASE_FUNCTION_URL)
+            .openConnection() as HttpURLConnection
+
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            connection.doOutput = true
+
+            connection.setRequestProperty(
+                "Authorization",
+                "Bearer $token"
+            )
+
+            connection.setRequestProperty(
+                "Content-Type",
+                "multipart/form-data; boundary=$boundary"
+            )
+
+            connection.outputStream.use { output ->
+
+                writeText(
+                    output,
+                    "--$boundary\r\n"
+                )
+
+                writeText(
+                    output,
+                    "Content-Disposition: form-data; " +
+                            "name=\"file\"; filename=\"avatar.$extension\"\r\n"
+                )
+
+                writeText(
+                    output,
+                    "Content-Type: $mimeType\r\n\r\n"
+                )
+
+                output.write(fileBytes)
+
+                writeText(
+                    output,
+                    "\r\n--$boundary--\r\n"
+                )
+            }
+
+            val responseCode = connection.responseCode
+
+            val responseStream =
+                if (responseCode in 200..299) {
+                    connection.inputStream
+                } else {
+                    connection.errorStream
+                }
+
+            val response = responseStream
+                ?.bufferedReader()
+                ?.use { it.readText() }
+                .orEmpty()
+
+            if (responseCode !in 200..299) {
+                error(
+                    "Ошибка загрузки ($responseCode): $response"
+                )
+            }
+
+            JSONObject(response).getString("url")
+
+        } finally {
+            connection.disconnect()
+        }
     }
 
+    // Записывает текст в поток загрузки.
+    private fun writeText(
+        output: OutputStream,
+        text: String
+    ) {
+        output.write(
+            text.toByteArray(Charsets.UTF_8)
+        )
+    }
 
+    // Сохраняет аватар в Supabase и записывает URL в Firestore.
+    private fun saveAvatar(uri: Uri) {
+        val user = auth.currentUser
 
+        if (user == null) {
+            showToast("Сначала войди в аккаунт")
+            return
+        }
+
+        activity.lifecycleScope.launch {
+            try {
+                val avatarUrl = uploadAvatarToSupabase(uri)
+
+                withContext(Dispatchers.IO) {
+                    val batch = db.batch()
+
+                    val avatarData = mapOf(
+                        "avatarUrl" to avatarUrl,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+
+                    batch.set(
+                        db.collection("users")
+                            .document(user.uid),
+                        avatarData,
+                        SetOptions.merge()
+                    )
+
+                    batch.set(
+                        db.collection("publicProfiles")
+                            .document(user.uid),
+                        mapOf("avatarUrl" to avatarUrl),
+                        SetOptions.merge()
+                    )
+
+                    Tasks.await(batch.commit())
+                }
+
+                showAvatar(avatarUrl)
+                showToast("Аватар обновлён")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка загрузки аватара", e)
+
+                showToast(
+                    "Не удалось загрузить аватар: ${e.localizedMessage}"
+                )
+            }
+        }
+    }
+
+    // Показывает диалог настроек.
     private fun showSettingsDialog() {
         val options = arrayOf(
             "Редактировать профиль",
@@ -516,151 +518,182 @@ class ProfileManager(
             "Информация о приложении"
         )
 
-        val white = android.graphics.Color.WHITE
-        val purple = android.graphics.Color.rgb(155, 122, 255)
-        val dark = android.graphics.Color.rgb(26, 26, 32)
-
         val dialog = AlertDialog.Builder(view.context)
             .setTitle("Настройки GamerHub")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> showEditDialog()
 
-                    1 -> {
-                        val activity = view.context as MainActivity
-                        activity.openAvatarPicker { uri ->
-                            saveAvatar(uri)
-                        }
+                    1 -> activity.openAvatarPicker { uri ->
+                        saveAvatar(uri)
                     }
 
-                    2 -> {
-                        val aboutDialog = AlertDialog.Builder(view.context)
-                            .setTitle("О GamerHub")
-                            .setMessage(
-                                "GamerHub — место для общения игроков, " +
-                                        "обсуждения игр и обмена игровым опытом."
-                            )
-                            .setPositiveButton("Понятно", null)
-                            .create()
-
-                        aboutDialog.setOnShowListener {
-                            aboutDialog.window?.setBackgroundDrawable(
-                                android.graphics.drawable.ColorDrawable(dark)
-                            )
-
-                            aboutDialog.findViewById<TextView>(
-                                android.R.id.message
-                            )?.setTextColor(white)
-
-                            aboutDialog.getButton(
-                                AlertDialog.BUTTON_POSITIVE
-                            )?.setTextColor(purple)
-                        }
-
-                        aboutDialog.show()
-                    }
+                    2 -> showAboutDialog()
                 }
             }
             .setNegativeButton("Закрыть", null)
             .create()
 
         dialog.setOnShowListener {
+            styleDialog(dialog)
+
+            dialog.window?.setBackgroundDrawable(
+                ColorDrawable(dark)
+            )
+
+            for (i in 0 until dialog.listView.childCount) {
+                (dialog.listView.getChildAt(i) as? TextView)
+                    ?.setTextColor(white)
+            }
+        }
+
+        dialog.show()
+    }
+
+    // Показывает информацию о приложении.
+    private fun showAboutDialog() {
+        val dialog = AlertDialog.Builder(view.context)
+            .setTitle("О GamerHub")
+            .setMessage(
+                "GamerHub — место для общения игроков, " +
+                        "обсуждения игр и обмена игровым опытом."
+            )
+            .setPositiveButton("Понятно", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawable(
+                ColorDrawable(dark)
+            )
+
+            dialog.findViewById<TextView>(
+                android.R.id.message
+            )?.setTextColor(lightGray)
+
+            dialog.getButton(
+                AlertDialog.BUTTON_POSITIVE
+            )?.setTextColor(purple)
+
             val titleId = view.resources.getIdentifier(
                 "alertTitle",
                 "id",
                 "android"
             )
 
-            if (titleId != 0) {
-                dialog.findViewById<TextView>(titleId)
-                    ?.setTextColor(android.graphics.Color.WHITE)
-            }
-            dialog.window?.setBackgroundDrawable(
-                android.graphics.drawable.ColorDrawable(dark)
-            )
-
-            // Красим все пункты списка в белый цвет
-            val list = dialog.listView
-            list.setBackgroundColor(dark)
-
-            for (i in 0 until list.childCount) {
-                (list.getChildAt(i) as? TextView)?.setTextColor(white)
-            }
-
-            dialog.getButton(
-                AlertDialog.BUTTON_NEGATIVE
-            )?.setTextColor(purple)
+            dialog.findViewById<TextView>(
+                titleId
+            )?.setTextColor(white)
         }
 
         dialog.show()
     }
 
-
-
-    // Окно редактирования профиля
-
-    private fun showEditDialog() {
-        val usernameView = view.findViewById<TextView>(R.id.profileUsername)
-        val tagView = view.findViewById<TextView>(R.id.profileTag)
-        val bioView = view.findViewById<TextView>(R.id.profileBio)
-
-        val activity = view.context as MainActivity
-
-        val fields = android.widget.LinearLayout(view.context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(48, 16, 48, 0)
-        }
-        fields.setBackgroundColor(
-            android.graphics.Color.rgb(26, 26, 32)
+    // Применяет оформление к диалогам.
+    private fun styleDialog(dialog: AlertDialog) {
+        val titleId = view.resources.getIdentifier(
+            "alertTitle",
+            "id",
+            "android"
         )
 
-        val usernameInput = EditText(view.context).apply {
-            hint = "Имя пользователя"
-            setText(usernameView.text)
+        if (titleId != 0) {
+            dialog.findViewById<TextView>(
+                titleId
+            )?.setTextColor(white)
         }
 
-        val tagInput = EditText(view.context).apply {
-            hint = "@username"
-            setText(tagView.text)
+        val background = GradientDrawable().apply {
+            setColor(dark)
+            cornerRadius =
+                20 * view.resources.displayMetrics.density
         }
 
-        val bioInput = EditText(view.context).apply {
-            hint = "О себе"
-            setText(bioView.text)
+        dialog.window?.setBackgroundDrawable(background)
+
+        dialog.findViewById<TextView>(
+            android.R.id.message
+        )?.setTextColor(lightGray)
+
+        dialog.listView?.let { list ->
+            list.setBackgroundColor(dark)
+
+            list.divider = ColorDrawable(
+                android.graphics.Color.rgb(48, 48, 57)
+            )
+
+            list.dividerHeight = 1
+
+            for (i in 0 until list.childCount) {
+                (list.getChildAt(i) as? TextView)
+                    ?.setTextColor(white)
+            }
+        }
+
+        dialog.getButton(
+            AlertDialog.BUTTON_POSITIVE
+        )?.setTextColor(purple)
+
+        dialog.getButton(
+            AlertDialog.BUTTON_NEGATIVE
+        )?.setTextColor(purple)
+
+        dialog.getButton(
+            AlertDialog.BUTTON_NEUTRAL
+        )?.setTextColor(purple)
+    }
+
+    // Открывает окно редактирования профиля.
+    private fun showEditDialog() {
+        val usernameView = view.findViewById<TextView>(
+            R.id.profileUsername
+        )
+
+        val tagView = view.findViewById<TextView>(
+            R.id.profileTag
+        )
+
+        val bioView = view.findViewById<TextView>(
+            R.id.profileBio
+        )
+
+        val fields = LinearLayout(view.context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 0)
+            setBackgroundColor(dark)
+        }
+
+        val usernameInput = createEditText(
+            "Имя пользователя",
+            usernameView.text.toString()
+        )
+
+        val tagInput = createEditText(
+            "@username",
+            tagView.text.toString()
+        )
+
+        val bioInput = createEditText(
+            "О себе",
+            bioView.text.toString()
+        ).apply {
             minLines = 3
-            gravity = android.view.Gravity.TOP
+            gravity = Gravity.TOP
         }
-
-        val purple = android.graphics.Color.rgb(155, 122, 255)
-        val white = android.graphics.Color.WHITE
-        val hintGray = android.graphics.Color.rgb(170, 170, 170)
-
-        // Делаем все поля ввода подходящими для тёмной темы
-        listOf(usernameInput, tagInput, bioInput).forEach { input ->
-            input.setTextColor(white)
-            input.setHintTextColor(hintGray)
-
-            // Фиолетовый цвет линии поля ввода
-            input.backgroundTintList =
-                android.content.res.ColorStateList.valueOf(purple)
-        }
-
 
         fields.addView(usernameInput)
         fields.addView(tagInput)
         fields.addView(bioInput)
 
-        // Заголовок списка ролей
-        val rolesTitle = TextView(view.context).apply {
-            text = "Мои роли"
-            textSize = 16f
-            setTextColor(android.graphics.Color.WHITE)
-            setPadding(0, 24, 0, 8)
-        }
-        fields.addView(rolesTitle)
+        fields.addView(
+            TextView(view.context).apply {
+                text = "Мои роли"
+                textSize = 16f
+                setTextColor(white)
+                setPadding(0, 24, 0, 8)
+            }
+        )
 
-        // Загружаем роли, которые уже отображаются в профиле
-        val rolesContainer = view.findViewById<android.widget.LinearLayout>(
+        val rolesContainer = view.findViewById<LinearLayout>(
             R.id.profileRolesContainer
         )
 
@@ -669,15 +702,13 @@ class ProfileManager(
             .map { (it as TextView).text.toString() }
             .toSet()
 
-        val roleCheckboxes = mutableMapOf<String, android.widget.CheckBox>()
+        val roleCheckboxes = mutableMapOf<String, CheckBox>()
 
-
-        for (role in availableRoles) {
-            val checkBox = android.widget.CheckBox(view.context).apply {
+        availableRoles.forEach { role ->
+            val checkBox = CheckBox(view.context).apply {
                 text = role
-                setTextColor(android.graphics.Color.WHITE)
-                buttonTintList =
-                    android.content.res.ColorStateList.valueOf(purple)
+                setTextColor(white)
+                buttonTintList = ColorStateList.valueOf(purple)
                 isChecked = role in currentRoles
             }
 
@@ -685,124 +716,170 @@ class ProfileManager(
             fields.addView(checkBox)
         }
 
-
-        AlertDialog.Builder(view.context)
+        val dialog = AlertDialog.Builder(view.context)
             .setTitle("Редактировать профиль")
             .setView(fields)
             .setNegativeButton("Отмена", null)
-            .setPositiveButton("Сохранить") { _, _ ->
-                val username = usernameInput.text.toString().trim()
-                val tag = tagInput.text.toString().trim()
-                val bio = bioInput.text.toString().trim()
+            .setPositiveButton("Сохранить", null)
+            .create()
+
+        dialog.setOnShowListener {
+            styleDialog(dialog)
+
+            dialog.getButton(
+                AlertDialog.BUTTON_POSITIVE
+            ).setOnClickListener {
+
+                val username = usernameInput.text
+                    .toString()
+                    .trim()
+
+                val tag = tagInput.text
+                    .toString()
+                    .trim()
+
+                val bio = bioInput.text
+                    .toString()
+                    .trim()
 
                 if (username.isBlank() || tag.isBlank()) {
-                    Toast.makeText(
-                        view.context,
-                        "Имя и тег не должны быть пустыми",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@setPositiveButton
+                    showToast(
+                        "Имя и тег не должны быть пустыми"
+                    )
+                    return@setOnClickListener
                 }
 
-                val normalizedTag = if (tag.startsWith("@")) tag else "@$tag"
+                val normalizedTag =
+                    if (tag.startsWith("@")) tag else "@$tag"
 
                 val selectedRoles = roleCheckboxes
-                    .filter { it.value.isChecked }
+                    .filterValues { it.isChecked }
                     .keys
                     .joinToString("|")
 
                 if (selectedRoles.isBlank()) {
-                    Toast.makeText(
-                        view.context,
-                        "Выбери хотя бы одну роль",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    return@setPositiveButton
+                    showToast("Выбери хотя бы одну роль")
+                    return@setOnClickListener
                 }
 
-                activity.lifecycleScope.launch {
-                    val uid = FirebaseAuth.getInstance().currentUser?.uid
-
-                    if (uid == null) {
-                        Toast.makeText(
-                            view.context,
-                            "Не удалось определить аккаунт",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@launch
-                    }
-
-                    try {
-                        withContext(Dispatchers.IO) {
-                            val db = FirebaseFirestore.getInstance()
-                            val batch = db.batch()
-
-                            // Данные приватного профиля
-                            val privateProfile = hashMapOf(
-                                "uid" to uid,
-                                "username" to username,
-                                "tag" to normalizedTag,
-                                "bio" to bio,
-                                "roles" to selectedRoles,
-                                "updatedAt" to
-                                        com.google.firebase.firestore.FieldValue.serverTimestamp()
-                            )
-
-                            // Данные для поиска пользователей
-                            val publicProfile = hashMapOf(
-                                "uid" to uid,
-                                "username" to username,
-                                "tag" to normalizedTag
-                            )
-
-                            // Сохраняем приватный профиль
-                            batch.set(
-                                db.collection("users").document(uid),
-                                privateProfile,
-                                SetOptions.merge()
-                            )
-
-                            // Сохраняем публичный профиль
-                            batch.set(
-                                db.collection("publicProfiles").document(uid),
-                                publicProfile,
-                                SetOptions.merge()
-                            )
-
-                            // Ждём завершения сохранения
-                            Tasks.await(batch.commit())
-                        }
-
-                        // Обновляем отображение профиля
+                saveProfileChanges(
+                    username = username,
+                    tag = normalizedTag,
+                    bio = bio,
+                    roles = selectedRoles,
+                    onSuccess = {
                         usernameView.text = username
                         tagView.text = normalizedTag
                         bioView.text = bio
+
                         renderRoles(selectedRoles)
 
-                        Toast.makeText(
-                            view.context,
-                            "Профиль сохранён",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                    } catch (e: Exception) {
-                        android.util.Log.e(
-                            "GamerHubProfile",
-                            "Ошибка сохранения профиля",
-                            e
-                        )
-
-                        Toast.makeText(
-                            view.context,
-                            "Ошибка: ${e.message ?: e.javaClass.simpleName}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        showToast("Профиль сохранён")
+                        dialog.dismiss()
                     }
-
-                }
+                )
             }
-            .show()
-            .also { styleDialog(it) }
+        }
+
+        dialog.show()
     }
 
+    // Создаёт текстовое поле для редактирования.
+    private fun createEditText(
+        hintText: String,
+        value: String
+    ): EditText {
+        return EditText(view.context).apply {
+            hint = hintText
+            setText(value)
+            setTextColor(white)
+            setHintTextColor(lightGray)
+
+            backgroundTintList =
+                ColorStateList.valueOf(purple)
+        }
+    }
+
+    // Сохраняет изменения профиля в users и publicProfiles.
+    private fun saveProfileChanges(
+        username: String,
+        tag: String,
+        bio: String,
+        roles: String,
+        onSuccess: () -> Unit
+    ) {
+        val uid = auth.currentUser?.uid
+
+        if (uid == null) {
+            showToast("Не удалось определить аккаунт")
+            return
+        }
+
+        activity.lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val batch = db.batch()
+
+                    val privateProfile = hashMapOf(
+                        "uid" to uid,
+                        "username" to username,
+                        "tag" to tag,
+                        "bio" to bio,
+                        "roles" to roles,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+
+                    val publicProfile = hashMapOf(
+                        "uid" to uid,
+                        "username" to username,
+                        "tag" to tag
+                    )
+
+                    batch.set(
+                        db.collection("users")
+                            .document(uid),
+                        privateProfile,
+                        SetOptions.merge()
+                    )
+
+                    batch.set(
+                        db.collection("publicProfiles")
+                            .document(uid),
+                        publicProfile,
+                        SetOptions.merge()
+                    )
+
+                    Tasks.await(batch.commit())
+                }
+
+                onSuccess()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Ошибка сохранения профиля", e)
+
+                showToast(
+                    "Ошибка: ${e.message ?: e.javaClass.simpleName}"
+                )
+            }
+        }
+    }
+
+    // Показывает сообщение пользователю.
+    private fun showToast(message: String) {
+        Toast.makeText(
+            view.context,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private companion object {
+        const val TAG = "GamerHubProfile"
+
+        const val MAX_AVATAR_SIZE =
+            5 * 1024 * 1024
+
+        const val SUPABASE_FUNCTION_URL =
+            "https://rewxoagdwwstvuuiqtqc.supabase.co/functions/v1/funk"
+    }
 }
