@@ -278,13 +278,15 @@ class MainActivity : AppCompatActivity() {
         }
 
 
+
         navProfile.setOnClickListener {
             openPage(R.layout.screen_profile)
 
             val profileView = pageContainer.getChildAt(0)
-            ProfileManager(profileView).setup()
 
             val userId = FirebaseAuth.getInstance().currentUser?.uid
+
+            ProfileManager(profileView, postsManager).setup()
 
             if (userId != null) {
                 postsManager.loadUserPosts(profileView, userId)
@@ -292,6 +294,7 @@ class MainActivity : AppCompatActivity() {
 
             setActiveNav(navProfile)
         }
+
 
     }
 

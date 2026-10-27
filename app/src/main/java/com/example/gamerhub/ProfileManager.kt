@@ -33,8 +33,10 @@ import java.net.URL
 import java.util.UUID
 
 class ProfileManager(
-    private val view: View
+    private val view: View,
+    private val postsManager: PostsManager
 ) {
+
 
     private val activity: MainActivity
         get() = view.context as MainActivity
@@ -260,36 +262,31 @@ class ProfileManager(
     }
 
     // Настраивает переключение вкладок публикаций и сохранённого.
+
     private fun setupTabs() {
-        val postsContainer = view.findViewById<LinearLayout>(
+        val postsContainer = view.findViewById<View>(
             R.id.profilePostsContainer
         )
-
-        val emptyContainer = view.findViewById<View>(
+        val postsEmpty = view.findViewById<View>(
             R.id.profileEmptyContainer
+        )
+        val savedSection = view.findViewById<View>(
+            R.id.profileSavedSection
         )
 
         val postsTab = view.findViewById<TextView>(
             R.id.profilePostsTab
         )
-
         val savedTab = view.findViewById<TextView>(
             R.id.profileSavedTab
         )
 
-        val emptyMessage = view.findViewById<TextView>(
-            R.id.profileEmptyMessage
-        )
-
-        val emptyIcon = view.findViewById<TextView>(
-            R.id.profilePostsEmpty
-        )
+        var savedLoaded = false
 
         fun selectTab(showPosts: Boolean) {
             postsTab.setTextColor(
                 if (showPosts) purple else gray
             )
-
             savedTab.setTextColor(
                 if (showPosts) gray else purple
             )
@@ -298,31 +295,25 @@ class ProfileManager(
                 null,
                 if (showPosts) Typeface.BOLD else Typeface.NORMAL
             )
-
             savedTab.setTypeface(
                 null,
                 if (showPosts) Typeface.NORMAL else Typeface.BOLD
             )
 
-            if (showPosts) {
-                emptyIcon.text = "📝"
-                emptyMessage.text = "У тебя пока нет публикаций"
+            postsContainer.visibility =
+                if (showPosts) View.VISIBLE else View.GONE
 
-                postsContainer.visibility = View.VISIBLE
+            postsEmpty?.visibility =
+                if (showPosts &&
+                    (postsContainer as? LinearLayout)?.childCount == 0
+                ) View.VISIBLE else View.GONE
 
-                emptyContainer.visibility =
-                    if (postsContainer.childCount == 0) {
-                        View.VISIBLE
-                    } else {
-                        View.GONE
-                    }
+            savedSection.visibility =
+                if (showPosts) View.GONE else View.VISIBLE
 
-            } else {
-                emptyIcon.text = "🔖"
-                emptyMessage.text = "Здесь пока ничего нет"
-
-                postsContainer.visibility = View.GONE
-                emptyContainer.visibility = View.VISIBLE
+            if (!showPosts && !savedLoaded) {
+                savedLoaded = true
+                postsManager.loadSavedPosts(view)
             }
         }
 
@@ -336,6 +327,7 @@ class ProfileManager(
 
         selectTab(true)
     }
+
 
     // Загружает изображение в Supabase и возвращает публичный URL.
     private suspend fun uploadAvatarToSupabase(

@@ -80,7 +80,7 @@ class NotificationsManager(
                     showEmpty(
                         container,
                         "Пока нет уведомлений.\n\n" +
-                                "Здесь появятся лайки и комментарии к твоим публикациям."
+                                "Здесь появятся подписки, лайки и комментарии."
                     )
                     return@addSnapshotListener
                 }
@@ -90,15 +90,21 @@ class NotificationsManager(
                     val actorName =
                         document.getString("actorName") ?: "Игрок"
                     val postTitle =
-                        document.getString("postTitle") ?: "Публикация"
+                        document.getString("postTitle").orEmpty()
                     val postId = document.getString("postId").orEmpty()
                     val isRead = document.getBoolean("read") ?: false
                     val createdAt =
                         document.getTimestamp("createdAt")?.toDate()
 
                     val message = when (type) {
-                        "comment" -> "$actorName прокомментировал(а) твою публикацию"
-                        else -> "$actorName поставил(а) лайк твоей публикации"
+                        "follow" ->
+                            "$actorName подписался(ась) на тебя"
+
+                        "comment" ->
+                            "$actorName прокомментировал(а) твою публикацию"
+
+                        else ->
+                            "$actorName поставил(а) лайк твоей публикации"
                     }
 
                     addNotification(
@@ -133,15 +139,22 @@ class NotificationsManager(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(16, 14, 16, 14)
+
             setBackgroundColor(
                 if (isRead) cardColor else Color.rgb(39, 32, 53)
             )
+
             isClickable = true
             isFocusable = true
         }
 
         val icon = TextView(context).apply {
-            text = if (type == "comment") "💬" else "❤️"
+            text = when (type) {
+                "follow" -> "👤"
+                "comment" -> "💬"
+                else -> "❤️"
+            }
+
             textSize = 25f
             gravity = Gravity.CENTER
         }
@@ -160,19 +173,26 @@ class NotificationsManager(
             text = message
             textSize = 14f
             setTextColor(primaryColor)
-            setTypeface(null, if (isRead) Typeface.NORMAL else Typeface.BOLD)
+
+            setTypeface(
+                null,
+                if (isRead) Typeface.NORMAL else Typeface.BOLD
+            )
         }
 
         textContainer.addView(messageView)
 
-        val titleView = TextView(context).apply {
-            text = postTitle
-            textSize = 13f
-            setTextColor(purpleColor)
-            setPadding(0, 5, 0, 0)
-        }
+        // Для уведомлений о подписке название публикации не нужно.
+        if (postTitle.isNotBlank()) {
+            val titleView = TextView(context).apply {
+                text = postTitle
+                textSize = 13f
+                setTextColor(purpleColor)
+                setPadding(0, 5, 0, 0)
+            }
 
-        textContainer.addView(titleView)
+            textContainer.addView(titleView)
+        }
 
         val timeView = TextView(context).apply {
             text = createdAt?.let {
@@ -208,21 +228,29 @@ class NotificationsManager(
         container.addView(card, cardParams)
 
         card.setOnClickListener {
-            if (postId.isBlank()) {
-                Toast.makeText(
-                    context,
-                    "У этого уведомления нет ID публикации",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return@setOnClickListener
-            }
-
+            // Отмечаем уведомление прочитанным.
             if (!isRead) {
                 db.collection("users")
                     .document(userId)
                     .collection("notifications")
                     .document(notificationId)
                     .update("read", true)
+            }
+
+            // У уведомления о подписке нет публикации.
+            // Поэтому открывать PostDetailsManager не нужно.
+            if (type == "follow") {
+                return@setOnClickListener
+            }
+
+            if (postId.isBlank()) {
+                Toast.makeText(
+                    context,
+                    "У этого уведомления нет ID публикации",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                return@setOnClickListener
             }
 
             onNotificationClick(postId)

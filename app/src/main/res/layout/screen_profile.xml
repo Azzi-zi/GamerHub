@@ -328,6 +328,8 @@
 
             <!-- Публикации пользователя -->
 
+
+            <!-- Контейнер опубликованных публикаций -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -367,10 +369,53 @@
                         android:text="У тебя пока нет публикаций"
                         android:textColor="#AAAAAA"
                         android:textSize="14sp" />
-
                 </LinearLayout>
-
             </FrameLayout>
+
+            <!-- Отдельный контейнер сохранённых публикаций -->
+            <FrameLayout
+                android:id="@+id/profileSavedSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/profileSavedPostsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/profileSavedEmptyContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:background="@drawable/bg_search"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="🔖"
+                        android:textColor="#FFFFFF"
+                        android:textSize="32sp" />
+
+                    <TextView
+                        android:id="@+id/profileSavedEmptyMessage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:text="Здесь пока нет сохранённых публикаций"
+                        android:textColor="#AAAAAA"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </FrameLayout>
+
 
 
         </LinearLayout>

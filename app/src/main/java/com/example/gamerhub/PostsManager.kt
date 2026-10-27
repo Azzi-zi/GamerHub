@@ -18,7 +18,8 @@ import com.bumptech.glide.Glide
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 class PostsManager(
     private val activity: AppCompatActivity
 ) {
@@ -225,12 +226,17 @@ class PostsManager(
                 )
 
                 if (posts.isEmpty()) {
+                    container.visibility = View.GONE
                     emptyContainer?.visibility = View.VISIBLE
+
+                    view.findViewById<TextView>(
+                        R.id.profileEmptyMessage
+                    )?.text = "У тебя пока нет публикаций"
                 } else {
+                    container.visibility = View.VISIBLE
                     emptyContainer?.visibility = View.GONE
 
                     posts.forEach { post ->
-                        // Используем ту же карточку, что и в общей ленте.
                         container.addView(createPostCard(post))
                     }
                 }
@@ -254,6 +260,97 @@ class PostsManager(
             }
         }
     }
+
+
+    // Загружает сохранённые публикации текущего пользователя.
+
+    fun loadSavedPosts(view: View) {
+        val uid = com.google.firebase.auth.FirebaseAuth
+            .getInstance().currentUser?.uid ?: return
+
+        val container = view.findViewById<LinearLayout>(
+            R.id.profileSavedPostsContainer
+        ) ?: return
+
+        val emptyContainer = view.findViewById<View>(
+            R.id.profileSavedEmptyContainer
+        )
+
+        val emptyMessage = view.findViewById<TextView>(
+            R.id.profileSavedEmptyMessage
+        )
+
+        activity.lifecycleScope.launch {
+            try {
+                container.removeAllViews()
+                emptyContainer?.visibility = View.GONE
+
+                val savedSnapshot = db.collection("users")
+                    .document(uid)
+                    .collection("savedPosts")
+                    .get()
+                    .await()
+
+                val savedIds = savedSnapshot.documents
+                    .map { it.getString("postId") ?: it.id }
+                    .toSet()
+
+                if (savedIds.isEmpty()) {
+                    emptyMessage?.text =
+                        "Здесь пока нет сохранённых публикаций"
+                    emptyContainer?.visibility = View.VISIBLE
+                    return@launch
+                }
+
+                // Загружаем публикации одним запросом.
+                val allPosts = db.collection("posts")
+                    .get()
+                    .await()
+
+                val postsById = allPosts.documents
+                    .filter { it.id in savedIds }
+                    .mapNotNull { document ->
+                        document.toObject(Post::class.java)
+                            ?.copy(id = document.id)
+                    }
+
+                // Сохраняем порядок по времени сохранения.
+                val orderedPosts = savedSnapshot.documents
+                    .mapNotNull { savedDocument ->
+                        val postId = savedDocument.getString("postId")
+                            ?: savedDocument.id
+
+                        postsById.find { it.id == postId }
+                    }
+
+                container.removeAllViews()
+
+                if (orderedPosts.isEmpty()) {
+                    emptyMessage?.text =
+                        "Сохранённые публикации больше недоступны"
+                    emptyContainer?.visibility = View.VISIBLE
+                } else {
+                    orderedPosts.forEach { post ->
+                        container.addView(createPostCard(post))
+                    }
+                }
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "PostsManager",
+                    "Ошибка загрузки сохранённых публикаций",
+                    e
+                )
+
+                emptyMessage?.text =
+                    "Не удалось загрузить сохранённое"
+                emptyContainer?.visibility = View.VISIBLE
+            }
+        }
+    }
+
+
+
 
     fun createProfilePostCard(post: Post): View {
         return createPostCard(post)
@@ -331,6 +428,134 @@ class PostsManager(
         }
 
         imageContainer.addView(categoryLabel)
+
+
+        // Кнопка сохранения публикации
+        val bookmarkButton = TextView(activity).apply {
+            text = "🔖"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setPadding(12, 8, 12, 8)
+            contentDescription = "Сохранить публикацию"
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(30, 30, 40))
+                cornerRadius = 14f
+            }
+
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END
+            ).apply {
+                setMargins(0, 12, 12, 0)
+            }
+        }
+
+        imageContainer.addView(bookmarkButton)
+
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+
+        if (uid != null && post.id.isNotBlank()) {
+            val savedRef = db.collection("users")
+                .document(uid)
+                .collection("savedPosts")
+                .document(post.id)
+
+            var isSaved = false
+            var requestInProgress = false
+
+            // Проверяем, сохранена ли публикация ранее.
+            activity.lifecycleScope.launch {
+                try {
+                    isSaved = savedRef.get().await().exists()
+
+                    bookmarkButton.text =
+                        if (isSaved) "🔖" else "♧"
+
+                    bookmarkButton.contentDescription =
+                        if (isSaved) {
+                            "Убрать из сохранённого"
+                        } else {
+                            "Сохранить публикацию"
+                        }
+                } catch (e: Exception) {
+                    android.util.Log.e(
+                        "PostsManager",
+                        "Не удалось проверить сохранение",
+                        e
+                    )
+                }
+            }
+
+            bookmarkButton.setOnClickListener {
+                if (requestInProgress) {
+                    return@setOnClickListener
+                }
+
+                requestInProgress = true
+                bookmarkButton.isEnabled = false
+
+                activity.lifecycleScope.launch {
+                    try {
+                        if (isSaved) {
+                            savedRef.delete().await()
+                            isSaved = false
+
+                            Toast.makeText(
+                                activity,
+                                "Публикация удалена из сохранённого",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            savedRef.set(
+                                mapOf(
+                                    "postId" to post.id,
+                                    "createdAt" to
+                                            FieldValue.serverTimestamp()
+                                )
+                            ).await()
+
+                            isSaved = true
+
+                            Toast.makeText(
+                                activity,
+                                "Публикация сохранена",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                        bookmarkButton.text =
+                            if (isSaved) "🔖" else "♧"
+
+                        bookmarkButton.contentDescription =
+                            if (isSaved) {
+                                "Убрать из сохранённого"
+                            } else {
+                                "Сохранить публикацию"
+                            }
+
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "PostsManager",
+                            "Ошибка сохранения публикации",
+                            e
+                        )
+
+                        Toast.makeText(
+                            activity,
+                            "Не удалось изменить сохранение",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } finally {
+                        requestInProgress = false
+                        bookmarkButton.isEnabled = true
+                    }
+                }
+            }
+        } else {
+            bookmarkButton.isEnabled = false
+        }
+
 
 
         val textContainer = LinearLayout(activity).apply {
