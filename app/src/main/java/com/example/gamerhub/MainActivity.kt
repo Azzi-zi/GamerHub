@@ -178,9 +178,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Создаём менеджеры после инициализации контейнера
-        chatsManager = ChatsManager(this) { layoutId ->
-            openPage(layoutId)
-        }
+
+        chatsManager = ChatsManager(
+            activity = this,
+            openPage = { layoutId ->
+                openPage(layoutId)
+            },
+            openPublicProfile = { userId, onBack ->
+                this@MainActivity.openPublicProfile(userId, onBack)
+            }
+        )
+
 
         createPostManager = CreatePostManager(
             this

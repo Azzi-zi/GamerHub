@@ -29,7 +29,8 @@ import java.util.Locale
 
 class ChatsManager(
     private val activity: AppCompatActivity,
-    private val openPage: (Int) -> Unit
+    private val openPage: (Int) -> Unit,
+    private val openPublicProfile: (String, () -> Unit) -> Unit
 ) {
     private val db = FirebaseFirestore.getInstance()
 
@@ -689,6 +690,63 @@ class ChatsManager(
         title.text = currentChatUsername
 
         val avatar = view.findViewById<ImageView>(R.id.chatAvatar)
+
+
+        // Открытие публичного профиля собеседника
+        val openChatProfile = {
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+
+            if (currentUid == null) {
+                Toast.makeText(
+                    activity,
+                    "Сначала войди в аккаунт",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                db.collection("chats")
+                    .document(chatId)
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val participants = document.get("participants")
+                                as? List<*>
+
+                        val otherUid = participants
+                            ?.filterIsInstance<String>()
+                            ?.firstOrNull { it != currentUid }
+
+                        if (!otherUid.isNullOrBlank()) {
+                            openPublicProfile(otherUid) {
+                                // Возвращаемся в эту переписку
+                                openPage(R.layout.screen_private_chat)
+                            }
+                        } else {
+                            Toast.makeText(
+                                activity,
+                                "Не удалось найти профиль собеседника",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(
+                            activity,
+                            "Не удалось открыть профиль",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+            }
+        }
+
+        // Нажатие на аватарку
+        avatar.setOnClickListener {
+            openChatProfile()
+        }
+
+        // Нажатие на никнейм
+        title.setOnClickListener {
+            openChatProfile()
+        }
+
 
         if (currentChatAvatarUrl.startsWith("http")) {
             Glide.with(avatar)
