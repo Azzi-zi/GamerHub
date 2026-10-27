@@ -1,7 +1,7 @@
-
 package com.example.gamerhub
 
-
+import android.widget.ImageView
+import com.bumptech.glide.Glide
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -18,10 +18,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.gms.tasks.Tasks
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -37,12 +35,15 @@ class ChatsManager(
 
     private var currentChatId: String? = null
     private var currentChatUsername = ""
+    private var currentChatAvatarUrl = ""
+
     private var chatListener: ListenerRegistration? = null
     private var messagesListener: ListenerRegistration? = null
 
     private data class ChatRowData(
         val chatId: String,
         val username: String,
+        val avatarUrl: String,
         val lastMessage: String,
         val lastMessageAt: Timestamp?
     )
@@ -70,7 +71,6 @@ class ChatsManager(
             }
 
             R.layout.screen_new_chat -> setupUserSearch(view)
-
             R.layout.screen_private_chat -> setupPrivateChat(view)
         }
     }
@@ -78,8 +78,6 @@ class ChatsManager(
     // ---------------------------------------------------------
     // Поиск пользователей для создания личного чата
     // ---------------------------------------------------------
-
-
 
     private fun setupUserSearch(view: View) {
         val searchInput =
@@ -101,8 +99,6 @@ class ChatsManager(
             ) {}
 
             override fun afterTextChanged(s: Editable?) {
-                // Оставляем исходный запрос для отображения и
-                // нормализуем его отдельно для поиска.
                 val rawQuery = s?.toString()?.trim().orEmpty()
                 val query = rawQuery
                     .removePrefix("@")
@@ -125,30 +121,23 @@ class ChatsManager(
                             val uid = document.getString("uid") ?: document.id
                             val username =
                                 document.getString("username").orEmpty()
+
                             val tag = (
                                     document.getString("tag")
                                         ?: document.getString("usernameTag")
                                         ?: ""
                                     ).trim()
 
-                            // Убираем @ только при сравнении.
                             val normalizedTag = tag
-                                .trim()
                                 .removePrefix("@")
                                 .lowercase(Locale.ROOT)
-
-                            android.util.Log.d(
-                                "GamerHubSearch",
-                                "username='$username', tag='$tag', query='$rawQuery'"
-                            )
 
                             uid != currentUid &&
                                     (
                                             username.contains(
                                                 query,
                                                 ignoreCase = true
-                                            ) ||
-                                                    normalizedTag.contains(query)
+                                            ) || normalizedTag.contains(query)
                                             )
                         }.take(30)
 
@@ -166,6 +155,7 @@ class ChatsManager(
                                 document.getString("uid") ?: document.id
                             val username =
                                 document.getString("username") ?: "Игрок"
+
                             val tag = (
                                     document.getString("tag")
                                         ?: document.getString("usernameTag")
@@ -201,8 +191,15 @@ class ChatsManager(
 
                             resultsContainer.addView(item, params)
 
+                            val avatarUrl =
+                                document.getString("avatarUrl").orEmpty()
+
                             item.setOnClickListener {
-                                createPrivateChat(uid, username)
+                                createPrivateChat(
+                                    uid,
+                                    username,
+                                    avatarUrl
+                                )
                             }
                         }
                     }
@@ -257,14 +254,14 @@ class ChatsManager(
                     .get()
                     .addOnSuccessListener { snapshot ->
                         results.removeAllViews()
-
                         var found = false
 
                         snapshot.documents.forEach { document ->
                             val uid =
                                 document.getString("uid") ?: document.id
                             val username =
-                                document.getString("username") ?: return@forEach
+                                document.getString("username")
+                                    ?: return@forEach
 
                             if (uid == currentUid) return@forEach
 
@@ -274,10 +271,12 @@ class ChatsManager(
                                 text = "🎮  $username"
                                 setTextColor(Color.WHITE)
                                 textSize = 16f
-                                setPadding(16, 14, 16, 14)
+                                setPadding(dp(16), dp(14), dp(16), dp(14))
                                 background = roundedBackground(
                                     Color.rgb(26, 26, 32), 12
                                 )
+                                isClickable = true
+                                isFocusable = true
                             }
 
                             val params = LinearLayout.LayoutParams(
@@ -289,8 +288,15 @@ class ChatsManager(
 
                             results.addView(item, params)
 
+                            val avatarUrl =
+                                document.getString("avatarUrl").orEmpty()
+
                             item.setOnClickListener {
-                                createPrivateChat(uid, username)
+                                createPrivateChat(
+                                    uid,
+                                    username,
+                                    avatarUrl
+                                )
                             }
                         }
 
@@ -298,7 +304,7 @@ class ChatsManager(
                             results.addView(TextView(activity).apply {
                                 text = "Игроки не найдены"
                                 setTextColor(Color.LTGRAY)
-                                setPadding(16, 14, 16, 14)
+                                setPadding(dp(16), dp(14), dp(16), dp(14))
                             })
                         }
                     }
@@ -307,7 +313,7 @@ class ChatsManager(
                         results.addView(TextView(activity).apply {
                             text = "Не удалось загрузить игроков"
                             setTextColor(Color.LTGRAY)
-                            setPadding(16, 14, 16, 14)
+                            setPadding(dp(16), dp(14), dp(16), dp(14))
                         })
                     }
             }
@@ -315,17 +321,14 @@ class ChatsManager(
             override fun afterTextChanged(s: Editable?) {}
         })
     }
-
     // ---------------------------------------------------------
     // Создание чата или открытие уже существующего
     // ---------------------------------------------------------
 
-
-
-
     private fun createPrivateChat(
         otherUid: String,
-        otherUsername: String
+        otherUsername: String,
+        otherAvatarUrl: String = ""
     ) {
         val currentUser = FirebaseAuth.getInstance().currentUser
 
@@ -347,25 +350,23 @@ class ChatsManager(
             return
         }
 
-        // Сначала загружаем чаты текущего пользователя.
-        // Так мы найдём существующий чат независимо от порядка UID в его ID.
         db.collection("chats")
             .whereArrayContains("participants", currentUser.uid)
             .get()
             .addOnSuccessListener { snapshot ->
-
                 val existingChat = snapshot.documents.firstOrNull { document ->
                     val participants =
                         document.get("participants") as? List<*>
-
                     participants?.contains(otherUid) == true
                 }
 
                 if (existingChat != null) {
-                    // Чат уже существует — открываем его, не перезаписывая данные.
-                    openPrivateChat(existingChat.id, otherUsername)
+                    openPrivateChat(
+                        existingChat.id,
+                        otherUsername,
+                        otherAvatarUrl
+                    )
                 } else {
-                    // Чат не найден — создаём новый с единообразным ID.
                     val participants =
                         listOf(currentUser.uid, otherUid).sorted()
 
@@ -384,7 +385,11 @@ class ChatsManager(
                         .document(chatId)
                         .set(chatData)
                         .addOnSuccessListener {
-                            openPrivateChat(chatId, otherUsername)
+                            openPrivateChat(
+                                chatId,
+                                otherUsername,
+                                otherAvatarUrl
+                            )
                         }
                         .addOnFailureListener { error ->
                             Toast.makeText(
@@ -404,19 +409,20 @@ class ChatsManager(
             }
     }
 
-
-
-
-    private fun openPrivateChat(chatId: String, username: String) {
+    private fun openPrivateChat(
+        chatId: String,
+        username: String,
+        avatarUrl: String = ""
+    ) {
         currentChatId = chatId
         currentChatUsername = username
+        currentChatAvatarUrl = avatarUrl
         openPage(R.layout.screen_private_chat)
     }
 
     // ---------------------------------------------------------
-    // Загрузка реального списка переписок из Firestore
+    // Загрузка списка переписок из Firestore
     // ---------------------------------------------------------
-
 
     private fun setupChatList(view: View) {
         val container =
@@ -424,18 +430,10 @@ class ChatsManager(
         val emptyText =
             view.findViewById<TextView>(R.id.chatsEmptyText)
 
-        // Убираем предыдущий listener, чтобы не создавать дубликаты
         chatListener?.remove()
         chatListener = null
 
-        val user = FirebaseAuth.getInstance().currentUser
-        val uid = user?.uid
-
-        android.util.Log.d("GamerHubChats", "UID: $uid")
-        android.util.Log.d(
-            "GamerHubChats",
-            "Project: ${com.google.firebase.FirebaseApp.getInstance().options.projectId}"
-        )
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
 
         if (uid == null) {
             emptyText.text = "Войди в аккаунт, чтобы увидеть чаты"
@@ -450,16 +448,10 @@ class ChatsManager(
             .whereArrayContains("participants", uid)
             .addSnapshotListener { snapshot, error ->
 
-                android.util.Log.d(
-                    "GamerHubChats",
-                    "Из кэша: ${snapshot?.metadata?.isFromCache}, " +
-                            "количество: ${snapshot?.size()}"
-                )
-
                 if (error != null) {
                     android.util.Log.e(
                         "GamerHubChats",
-                        "Ошибка списка чатов: code=${error.code}, message=${error.message}",
+                        "Ошибка списка чатов: ${error.message}",
                         error
                     )
 
@@ -470,19 +462,10 @@ class ChatsManager(
                 }
 
                 if (snapshot == null) {
-                    android.util.Log.w(
-                        "GamerHubChats",
-                        "Snapshot равен null, ошибки нет"
-                    )
                     emptyText.text = "Ожидание данных чатов..."
                     emptyText.visibility = View.VISIBLE
                     return@addSnapshotListener
                 }
-
-                android.util.Log.d(
-                    "GamerHubChats",
-                    "Список получен: ${snapshot.size()} документов"
-                )
 
                 val documents = snapshot.documents.sortedByDescending {
                     it.getTimestamp("lastMessageAt")?.toDate()?.time ?: 0L
@@ -511,11 +494,6 @@ class ChatsManager(
                         ?.firstOrNull { it != uid }
 
                     if (otherUid == null) {
-                        android.util.Log.w(
-                            "GamerHubChats",
-                            "У чата ${document.id} не найден второй участник"
-                        )
-
                         remaining--
                         if (remaining == 0) {
                             renderChatRows(container, rows)
@@ -529,7 +507,10 @@ class ChatsManager(
                         .addOnSuccessListener { profile ->
                             rows[index] = ChatRowData(
                                 chatId = document.id,
-                                username = profile.getString("username") ?: "Игрок",
+                                username = profile.getString("username")
+                                    ?: "Игрок",
+                                avatarUrl = profile.getString("avatarUrl")
+                                    .orEmpty(),
                                 lastMessage = document.getString("lastMessage")
                                     ?: "Начните общение!",
                                 lastMessageAt =
@@ -544,13 +525,15 @@ class ChatsManager(
                         .addOnFailureListener { profileError ->
                             android.util.Log.e(
                                 "GamerHubChats",
-                                "Не удалось загрузить профиль $otherUid: ${profileError.message}",
+                                "Не удалось загрузить профиль $otherUid: " +
+                                        profileError.message,
                                 profileError
                             )
 
                             rows[index] = ChatRowData(
                                 chatId = document.id,
                                 username = "Игрок",
+                                avatarUrl = "",
                                 lastMessage = document.getString("lastMessage")
                                     ?: "Начните общение!",
                                 lastMessageAt =
@@ -565,6 +548,10 @@ class ChatsManager(
                 }
             }
     }
+
+    // ---------------------------------------------------------
+    // Отрисовка списка чатов
+    // ---------------------------------------------------------
 
     private fun renderChatRows(
         container: LinearLayout,
@@ -584,13 +571,23 @@ class ChatsManager(
                 isFocusable = true
             }
 
-            val avatar = TextView(activity).apply {
-                text = "🎮"
-                textSize = 23f
-                gravity = Gravity.CENTER
+            val avatar = ImageView(activity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
                 background = roundedBackground(
-                    Color.rgb(48, 38, 62), 12
+                    Color.rgb(48, 38, 62), 25
                 )
+                clipToOutline = true
+            }
+
+            if (chat.avatarUrl.startsWith("http")) {
+                Glide.with(activity)
+                    .load(chat.avatarUrl)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .circleCrop()
+                    .into(avatar)
+            } else {
+                avatar.setImageResource(R.drawable.ic_launcher_foreground)
             }
 
             row.addView(
@@ -622,10 +619,13 @@ class ChatsManager(
             textColumn.addView(lastMessage)
 
             val textParams = LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
             ).apply {
                 marginStart = dp(12)
             }
+
             row.addView(textColumn, textParams)
 
             val time = TextView(activity).apply {
@@ -640,6 +640,7 @@ class ChatsManager(
             ).apply {
                 marginStart = dp(8)
             }
+
             row.addView(time, timeParams)
 
             val rowParams = LinearLayout.LayoutParams(
@@ -648,24 +649,26 @@ class ChatsManager(
             ).apply {
                 bottomMargin = dp(10)
             }
+
             container.addView(row, rowParams)
 
             row.setOnClickListener {
                 currentChatId = chat.chatId
                 currentChatUsername = chat.username
+                currentChatAvatarUrl = chat.avatarUrl
                 openPage(R.layout.screen_private_chat)
             }
         }
     }
-
     // ---------------------------------------------------------
-    // Экран переписки: загрузка истории и отправка сообщений
+    // Экран переписки: история и отправка сообщений
     // ---------------------------------------------------------
 
     private fun setupPrivateChat(view: View) {
         val chatId = currentChatId ?: run {
             Toast.makeText(
-                activity, "Не удалось открыть чат",
+                activity,
+                "Не удалось открыть чат",
                 Toast.LENGTH_SHORT
             ).show()
             openPage(R.layout.screen_chats)
@@ -676,17 +679,31 @@ class ChatsManager(
         val backButton = view.findViewById<TextView>(R.id.backButton)
         val input = view.findViewById<EditText>(R.id.messageInput)
         val sendButton = view.findViewById<TextView>(R.id.sendButton)
+
         val messagesContainer =
             view.findViewById<LinearLayout>(R.id.messagesContainer)
+
         val messagesScroll =
             view.findViewById<ScrollView>(R.id.messagesScroll)
 
         title.text = currentChatUsername
 
+        val avatar = view.findViewById<ImageView>(R.id.chatAvatar)
+
+        if (currentChatAvatarUrl.startsWith("http")) {
+            Glide.with(avatar)
+                .load(currentChatAvatarUrl)
+                .placeholder(R.drawable.ic_launcher_foreground)
+                .error(R.drawable.ic_launcher_foreground)
+                .circleCrop()
+                .into(avatar)
+        } else {
+            avatar.setImageResource(R.drawable.ic_launcher_foreground)
+        }
+
         backButton.setOnClickListener {
             openPage(R.layout.screen_chats)
         }
-
 
         fun sendMessage() {
             val text = input.text.toString().trim()
@@ -694,6 +711,7 @@ class ChatsManager(
             if (text.isEmpty()) return
 
             val uid = FirebaseAuth.getInstance().currentUser?.uid
+
             if (uid == null) {
                 Toast.makeText(
                     activity,
@@ -725,7 +743,8 @@ class ChatsManager(
                     ).addOnFailureListener { error ->
                         Toast.makeText(
                             activity,
-                            "Сообщение отправлено, но превью чата не обновилось: ${error.message}",
+                            "Сообщение отправлено, но превью чата " +
+                                    "не обновилось: ${error.message}",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -744,15 +763,17 @@ class ChatsManager(
                 }
         }
 
-
-        sendButton.setOnClickListener { sendMessage() }
+        sendButton.setOnClickListener {
+            sendMessage()
+        }
 
         input.setOnEditorActionListener { _, actionId, event ->
             val sendAction = actionId == EditorInfo.IME_ACTION_SEND
+
             val enterPressed =
                 event?.keyCode == KeyEvent.KEYCODE_ENTER &&
                         event.action == KeyEvent.ACTION_UP &&
-                        event.isShiftPressed.not()
+                        !event.isShiftPressed
 
             if (sendAction || enterPressed) {
                 sendMessage()
@@ -762,6 +783,8 @@ class ChatsManager(
             }
         }
 
+        messagesListener?.remove()
+
         messagesListener = db.collection("chats")
             .document(chatId)
             .collection("messages")
@@ -769,7 +792,8 @@ class ChatsManager(
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Toast.makeText(
-                        activity, "Не удалось загрузить сообщения",
+                        activity,
+                        "Не удалось загрузить сообщения: ${error.message}",
                         Toast.LENGTH_SHORT
                     ).show()
                     return@addSnapshotListener
@@ -779,65 +803,67 @@ class ChatsManager(
 
                 messagesContainer.removeAllViews()
 
-
-                val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                val currentUid =
+                    FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
 
                 snapshot.documents.forEach { document ->
-                    val senderId = document.getString("senderId") ?: ""
+                    val senderId = document.getString("senderId").orEmpty()
                     val text = document.getString("text") ?: return@forEach
                     val isMine = senderId == currentUid
 
-                    // Получаем список пользователей, прочитавших сообщение
                     val readBy = (document.get("readBy") as? List<*>)
                         ?.filterIsInstance<String>()
                         ?: emptyList()
 
-                    // Если это чужое сообщение, отмечаем его прочитанным
-                    if (!isMine && currentUid.isNotEmpty() && currentUid !in readBy) {
+                    // Помечаем входящее сообщение прочитанным.
+                    if (
+                        !isMine &&
+                        currentUid.isNotEmpty() &&
+                        currentUid !in readBy
+                    ) {
                         document.reference.update(
                             "readBy",
                             FieldValue.arrayUnion(currentUid)
                         )
                     }
 
-                    // Проверяем, прочитал ли сообщение собеседник
-                    val isReadByRecipient = isMine && readBy.any { it != senderId }
+                    // Проверяем, прочитал ли сообщение собеседник.
+                    val isReadByRecipient =
+                        isMine && readBy.any { it != senderId }
 
-                    // Получаем время сообщения
                     val timestamp = document.getTimestamp("createdAt")
                     val timeText = timestamp?.toDate()?.let {
-                        java.text.SimpleDateFormat(
+                        SimpleDateFormat(
                             "HH:mm",
-                            java.util.Locale.getDefault()
+                            Locale.getDefault()
                         ).format(it)
                     } ?: ""
 
-                    // Контейнер сообщения
                     val wrapper = LinearLayout(activity).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = if (isMine) Gravity.END else Gravity.START
                     }
 
-                    // Контейнер текста и времени
                     val bubble = LinearLayout(activity).apply {
                         orientation = LinearLayout.VERTICAL
                         setPadding(dp(14), dp(10), dp(14), dp(8))
 
                         background = roundedBackground(
-                            if (isMine) Color.rgb(112, 58, 180)
-                            else Color.rgb(40, 40, 48),
+                            if (isMine) {
+                                Color.rgb(112, 58, 180)
+                            } else {
+                                Color.rgb(40, 40, 48)
+                            },
                             16
                         )
                     }
 
-                    // Текст сообщения
                     val messageText = TextView(activity).apply {
                         this.text = text
                         textSize = 15f
                         setTextColor(Color.WHITE)
                     }
 
-                    // Время и галочки
                     val metadata = TextView(activity).apply {
                         val status = if (isMine) {
                             if (isReadByRecipient) "✓✓" else "✓"
@@ -877,7 +903,6 @@ class ChatsManager(
                     )
                 }
 
-
                 messagesScroll.post {
                     messagesScroll.fullScroll(View.FOCUS_DOWN)
                 }
@@ -899,19 +924,31 @@ class ChatsManager(
     }
 
     private fun dp(value: Int): Int {
-        return (value * activity.resources.displayMetrics.density).toInt()
+        return (
+                value * activity.resources.displayMetrics.density
+                ).toInt()
     }
 
     private fun formatTime(timestamp: Timestamp?): String {
         if (timestamp == null) return ""
 
         val date = timestamp.toDate()
-        val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(Date())
-        val messageDay = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-            .format(date)
+
+        val today = SimpleDateFormat(
+            "yyyyMMdd",
+            Locale.getDefault()
+        ).format(Date())
+
+        val messageDay = SimpleDateFormat(
+            "yyyyMMdd",
+            Locale.getDefault()
+        ).format(date)
 
         val pattern = if (today == messageDay) "HH:mm" else "dd.MM"
-        return SimpleDateFormat(pattern, Locale.getDefault()).format(date)
+
+        return SimpleDateFormat(
+            pattern,
+            Locale.getDefault()
+        ).format(date)
     }
 }
