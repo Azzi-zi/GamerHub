@@ -20,17 +20,18 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingTop="24dp"
-            android:paddingBottom="30dp">
+            android:paddingBottom="24dp">
 
-            <!-- Заголовок профиля -->
+            <!-- Верхняя панель -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -38,65 +39,114 @@
                     android:layout_weight="1"
                     android:text="Мой профиль"
                     android:textColor="#FFFFFF"
-                    android:textSize="26sp"
+                    android:textSize="24sp"
                     android:textStyle="bold" />
 
                 <ImageView
                     android:id="@+id/profileSettings"
                     android:layout_width="42dp"
                     android:layout_height="42dp"
-                    android:clickable="true"
-                    android:focusable="true"
                     android:background="@drawable/bg_category"
+                    android:clickable="true"
                     android:contentDescription="Настройки профиля"
+                    android:focusable="true"
                     android:padding="10dp"
                     android:src="@android:drawable/ic_menu_preferences"
-                    app:tint="#AAAAAA" />
+                    app:tint="#C6C8D8" />
 
             </LinearLayout>
 
-            <!-- Аватар и информация -->
+            <!-- Обложка профиля.
+                 Изображение можно будет загружать через Kotlin. -->
+
+            <!-- Обложка профиля -->
+            <FrameLayout
+                android:id="@+id/profileCoverContainer"
+                android:layout_width="match_parent"
+                android:layout_height="190dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
+
+                <ImageView
+                    android:id="@+id/profileCover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#1A1A20"
+                    android:contentDescription="Фоновое изображение профиля"
+                    android:scaleType="centerCrop" />
+
+                <!-- Затемнение для читаемости текста -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#44000000" />
+
+
+
+                <TextView
+                    android:id="@+id/changeCoverButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="10dp"
+                    android:background="@drawable/bg_category"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="📷 Обложка"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp" />
+
+            </FrameLayout>
+
+
+            <!-- Аватар и имя -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
+                android:layout_marginTop="-35dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="28dp"
+                android:paddingEnd="20dp">
 
                 <FrameLayout
                     android:id="@+id/profileAvatarContainer"
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
+                    android:layout_width="94dp"
+                    android:layout_height="94dp"
+                    android:background="@drawable/bg_create_button"
                     android:clickable="true"
-                    android:focusable="true">
+                    android:focusable="true"
+                    android:padding="3dp">
 
                     <ImageView
                         android:id="@+id/profileAvatar"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:background="@drawable/bg_create_button"
+                        android:background="#171B2B"
                         android:contentDescription="Аватар пользователя"
-                        android:padding="3dp"
                         android:scaleType="centerCrop"
                         android:src="@android:drawable/sym_def_app_icon" />
 
                     <TextView
-                        android:layout_width="30dp"
-                        android:layout_height="30dp"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
                         android:layout_gravity="bottom|end"
                         android:background="@drawable/bg_create_button"
                         android:gravity="center"
                         android:text="✎"
                         android:textColor="#FFFFFF"
-                        android:textSize="17sp" />
+                        android:textSize="15sp" />
 
                 </FrameLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="18dp"
                     android:layout_weight="1"
+                    android:layout_marginStart="14dp"
                     android:orientation="vertical">
 
                     <TextView
@@ -105,77 +155,103 @@
                         android:layout_height="wrap_content"
                         android:text="PlayerOne"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
-                        android:textStyle="bold" />
+                        android:textSize="21sp"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
 
                     <TextView
                         android:id="@+id/profileTag"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text=""
-                        android:textColor="#9B7AFF"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/profileEmail"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="email@example.com"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
-
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:fillViewport="false"
-                        android:scrollbars="none">
-
-                        <LinearLayout
-                            android:id="@+id/profileRolesContainer"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:background="@drawable/bg_category_active"
-                                android:paddingHorizontal="10dp"
-                                android:paddingVertical="5dp"
-                                android:text="🎮 Геймер"
-                                android:textColor="#FFFFFF"
-                                android:textSize="12sp" />
-
-                        </LinearLayout>
-
-                    </HorizontalScrollView>
+                        android:layout_marginTop="3dp"
+                        android:text="@player"
+                        android:textColor="#A9A9C5"
+                        android:textSize="13sp" />
 
                 </LinearLayout>
 
             </LinearLayout>
 
-            <!-- Описание профиля -->
+            <!-- Игровые роли -->
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:scrollbars="none"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <LinearLayout
+                    android:id="@+id/profileRolesContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_category_active"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:text="🎮 Геймер"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp" />
+
+                </LinearLayout>
+
+            </HorizontalScrollView>
+
+            <!-- Описание -->
             <TextView
                 android:id="@+id/profileBio"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="Люблю RPG, открытые миры и интересные игровые истории. Делюсь прохождениями и скриншотами."
-                android:textColor="#BBBBBB"
+                android:layout_marginTop="14dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="Люблю игры и делюсь интересными моментами."
+                android:textColor="#C3C6D8"
                 android:textSize="14sp"
-                android:lineSpacingExtra="4dp" />
+                android:lineSpacingExtra="3dp" />
 
-            <!-- Статистика -->
+            <TextView
+                android:id="@+id/profileEmail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="email@example.com"
+                android:textColor="#777F98"
+                android:textSize="12sp" />
+
+            <!-- Редактирование профиля -->
+            <Button
+                android:id="@+id/editProfileButton"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginEnd="20dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_create_button"
+                android:text="Редактировать профиль"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Статистика профиля -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="90dp"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/bg_search"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
                 android:gravity="center"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -190,23 +266,23 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="4dp"
                         android:text="Публикации"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
+                        android:textColor="#9299B2"
+                        android:textSize="11sp" />
 
                 </LinearLayout>
 
                 <View
                     android:layout_width="1dp"
-                    android:layout_height="45dp"
-                    android:background="#303039" />
+                    android:layout_height="38dp"
+                    android:background="#293047" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -221,23 +297,54 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:text="Друзья"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
+                        android:layout_marginTop="4dp"
+                        android:text="Подписчики"
+                        android:textColor="#9299B2"
+                        android:textSize="11sp" />
 
                 </LinearLayout>
 
                 <View
                     android:layout_width="1dp"
-                    android:layout_height="45dp"
-                    android:background="#303039" />
+                    android:layout_height="38dp"
+                    android:background="#293047" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/profileFollowingCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textColor="#FFFFFF"
+                        android:textSize="20sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Подписки"
+                        android:textColor="#9299B2"
+                        android:textSize="11sp" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="38dp"
+                    android:background="#293047" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -252,62 +359,63 @@
                         android:layout_height="wrap_content"
                         android:text="0"
                         android:textColor="#FFFFFF"
-                        android:textSize="22sp"
+                        android:textSize="20sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
+                        android:layout_marginTop="4dp"
                         android:text="Лайки"
-                        android:textColor="#888892"
-                        android:textSize="12sp" />
+                        android:textColor="#9299B2"
+                        android:textSize="11sp" />
 
                 </LinearLayout>
 
             </LinearLayout>
 
-            <!-- Редактирование профиля -->
-            <Button
-                android:id="@+id/editProfileButton"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/bg_create_button"
-                android:text="Редактировать профиль"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+            <!-- Любимые игры -->
 
-            <Button
-                android:id="@+id/logoutButton"
+            <!-- Любимые игры -->
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
-                android:backgroundTint="#302344"
-                android:text="Выйти из аккаунта"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp" />
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="vertical"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Любимые игры"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/profileFavoriteGames"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                </HorizontalScrollView>
+
+            </LinearLayout>
+
 
             <!-- Вкладки -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="55dp"
-                android:layout_marginTop="28dp"
+                android:layout_height="52dp"
+                android:layout_marginTop="18dp"
                 android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/profilePostsTab"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Публикации"
-                    android:textColor="#9B7AFF"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/profileSavedTab"
@@ -316,24 +424,34 @@
                     android:layout_weight="1"
                     android:gravity="center"
                     android:text="Сохранённое"
-                    android:textColor="#888892"
-                    android:textSize="15sp" />
+                    android:textColor="#9299B2"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/profilePostsTab"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Мои статьи"
+                    android:textColor="#9B7AFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="#292932" />
+                android:background="#293047" />
 
-            <!-- Публикации пользователя -->
-
-
-            <!-- Контейнер опубликованных публикаций -->
+            <!-- Опубликованные публикации -->
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="14dp">
 
                 <LinearLayout
                     android:id="@+id/profilePostsContainer"
@@ -369,15 +487,19 @@
                         android:text="У тебя пока нет публикаций"
                         android:textColor="#AAAAAA"
                         android:textSize="14sp" />
+
                 </LinearLayout>
+
             </FrameLayout>
 
-            <!-- Отдельный контейнер сохранённых публикаций -->
+            <!-- Сохранённые публикации -->
             <FrameLayout
                 android:id="@+id/profileSavedSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="14dp"
                 android:visibility="gone">
 
                 <LinearLayout
@@ -413,10 +535,10 @@
                         android:text="Здесь пока нет сохранённых публикаций"
                         android:textColor="#AAAAAA"
                         android:textSize="14sp" />
+
                 </LinearLayout>
+
             </FrameLayout>
-
-
 
         </LinearLayout>
 

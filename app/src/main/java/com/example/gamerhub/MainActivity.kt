@@ -431,7 +431,7 @@ class MainActivity : AppCompatActivity() {
         ).setup(view)
     }
 
-    private fun openPublicProfile(
+    fun openPublicProfile(
         userId: String,
         onBack: () -> Unit = {
             openHomePage()
