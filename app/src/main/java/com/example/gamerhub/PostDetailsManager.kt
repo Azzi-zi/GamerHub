@@ -15,7 +15,9 @@ import com.google.firebase.firestore.ListenerRegistration
 class PostDetailsManager(
     private val activity: AppCompatActivity,
     private val post: Post,
-    private val onBack: () -> Unit
+    private val onBack: () -> Unit,
+    private val onAuthorClick: (String) -> Unit = {}
+
 ) {
 
     private val db = FirebaseFirestore.getInstance()
@@ -66,9 +68,30 @@ class PostDetailsManager(
         }
 
         // Автор
-        view.findViewById<TextView>(
+
+        // Имя автора открывает его публичный профиль.
+        val authorView = view.findViewById<TextView>(
             R.id.postDetailsAuthor
-        ).text = "Автор: ${post.authorName}"
+        )
+
+        authorView.text = "Автор: ${post.authorName}"
+        authorView.setTextColor(
+            android.graphics.Color.rgb(180, 140, 255)
+        )
+        authorView.isClickable = true
+        authorView.isFocusable = true
+
+        authorView.setOnClickListener {
+            if (post.authorId.isNotBlank()) {
+                onAuthorClick(post.authorId)
+            } else {
+                Toast.makeText(
+                    activity,
+                    "Профиль автора недоступен",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
 
         // Текст публикации
         view.findViewById<TextView>(

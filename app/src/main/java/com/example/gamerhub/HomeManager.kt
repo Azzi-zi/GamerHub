@@ -3,10 +3,14 @@ package com.example.gamerhub
 
 import android.content.Intent
 import android.graphics.Color
+import android.text.Editable
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.View
+import android.widget.EditText
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -24,28 +28,27 @@ class HomeManager(
     private val onGameClick: (Game) -> Unit,
     private val onNotificationsClick: () -> Unit
 ) {
-    // Кэш каталога, чтобы не загружать игры при каждом переходе.
     private var cachedGames: List<Game>? = null
-
-    // Не допускаем одновременную загрузку одного каталога.
     private var isLoadingGames = false
 
-    // Настраиваем главную страницу
+    private var selectedCategory = "Все"
+    private var currentQuery = ""
+
     fun setup(view: View) {
         setupHomeLogo(view)
         setupNotificationsButton(view)
         setupHomeCategories(view)
+        setupSearch(view)
         loadGames(view)
     }
 
-    // Открываем уведомления при нажатии на колокольчик
     private fun setupNotificationsButton(view: View) {
-        view.findViewById<View>(R.id.notifications)?.setOnClickListener {
-            onNotificationsClick()
-        }
+        view.findViewById<View>(R.id.notifications)
+            ?.setOnClickListener {
+                onNotificationsClick()
+            }
     }
 
-    // Оформляем логотип
     private fun setupHomeLogo(view: View) {
         val title = view.findViewById<TextView>(R.id.logoText)
             ?: return
@@ -69,16 +72,12 @@ class HomeManager(
 
         title.text = spannable
 
-        // Сохраняем прежнее поведение нажатия на логотип
         title.setOnClickListener {
             activity.startActivity(
                 Intent(activity, RegisterActivity::class.java)
             )
         }
     }
-
-    // Настраиваем категории главной страницы
-
 
     private fun setupHomeCategories(view: View) {
         val categories = mapOf(
@@ -90,78 +89,110 @@ class HomeManager(
         )
 
         categories.forEach { (categoryId, categoryName) ->
-            view.findViewById<TextView>(categoryId)?.setOnClickListener {
+            view.findViewById<TextView>(categoryId)
+                ?.setOnClickListener {
 
-                // Подсвечиваем выбранную категорию
-                categories.forEach categoryLoop@{ (id, _) ->
-                    val category = view.findViewById<TextView>(id)
-                        ?: return@categoryLoop
+                    selectedCategory = categoryName
 
-                    val selected = id == categoryId
+                    categories.forEach categoryLoop@{ (id, _) ->
+                        val category = view.findViewById<TextView>(id)
+                            ?: return@categoryLoop
 
-                    category.setBackgroundResource(
-                        if (selected) {
-                            R.drawable.bg_category_active
-                        } else {
-                            R.drawable.bg_category
-                        }
-                    )
+                        val selected = id == categoryId
 
-                    category.setTextColor(
-                        if (selected) Color.WHITE
-                        else Color.rgb(170, 170, 170)
-                    )
+                        category.setBackgroundResource(
+                            if (selected) {
+                                R.drawable.bg_category_active
+                            } else {
+                                R.drawable.bg_category
+                            }
+                        )
+
+                        category.setTextColor(
+                            if (selected) {
+                                Color.WHITE
+                            } else {
+                                Color.rgb(170, 170, 170)
+                            }
+                        )
+                    }
+
+                    updateContent(view)
                 }
+        }
 
-                val gamesRecycler =
-                    view.findViewById<RecyclerView>(R.id.gamesRecyclerView)
+        // При открытии страницы выбираем категорию «Все».
+        updateContent(view)
+    }
 
-                val postsScroll =
-                    view.findViewById<android.widget.ScrollView>(
-                        R.id.postsScrollView
-                    )
+    private fun setupSearch(view: View) {
+        val searchInput = view.findViewById<EditText>(R.id.search)
+            ?: return
 
-                when (categoryName) {
-                    "Все" -> {
-                        gamesRecycler?.visibility = View.GONE
-                        postsScroll?.visibility = View.VISIBLE
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(
+                s: CharSequence?,
+                start: Int,
+                count: Int,
+                after: Int
+            ) = Unit
 
-                        postsManager.loadPosts(view, "Все")
-                    }
+            override fun onTextChanged(
+                s: CharSequence?,
+                start: Int,
+                before: Int,
+                count: Int
+            ) = Unit
 
-                    "Игры" -> {
-                        gamesRecycler?.visibility = View.VISIBLE
-                        postsScroll?.visibility = View.GONE
-
-                        loadGames(view)
-                    }
-
-                    "Гайды", "Новости", "Лор" -> {
-                        gamesRecycler?.visibility = View.GONE
-                        postsScroll?.visibility = View.VISIBLE
-
-                        postsManager.loadPosts(view, categoryName)
-                    }
-                }
+            override fun afterTextChanged(s: Editable?) {
+                currentQuery = s?.toString()?.trim().orEmpty()
+                updateContent(view)
             }
+        })
+    }
+
+    private fun updateContent(view: View) {
+        val gamesRecycler = view.findViewById<RecyclerView>(
+            R.id.gamesRecyclerView
+        ) ?: return
+
+        val postsScroll = view.findViewById<ScrollView>(
+            R.id.postsScrollView
+        ) ?: return
+
+        if (selectedCategory == "Игры") {
+            gamesRecycler.visibility = View.VISIBLE
+            postsScroll.visibility = View.GONE
+
+            val games = cachedGames
+
+            if (games != null) {
+                showFilteredGames(view, games)
+            } else {
+                loadGames(view)
+            }
+        } else {
+            gamesRecycler.visibility = View.GONE
+            postsScroll.visibility = View.VISIBLE
+
+            postsManager.loadPosts(
+                view = view,
+                category = if (selectedCategory == "Все") {
+                    "Все"
+                } else {
+                    selectedCategory
+                },
+                query = currentQuery
+            )
         }
     }
 
-
-    // Загружаем игры напрямую из Firestore
-
-    // Загружаем игры вместе с количеством лайков из Firebase.
-
     private fun loadGames(view: View) {
-        // Если каталог уже загружен, показываем сохранённые данные.
-        val cached = cachedGames
-
-        if (cached != null) {
-            showGames(view, cached)
+        cachedGames?.let { games ->
+            showFilteredGames(view, games)
             return
         }
 
-        // Не запускаем повторную загрузку, пока первая не закончилась.
         if (isLoadingGames) return
 
         isLoadingGames = true
@@ -169,29 +200,42 @@ class HomeManager(
         activity.lifecycleScope.launch {
             try {
                 val games = withContext(Dispatchers.IO) {
-                    repository.getGames()
+                    try {
+                        repository.getGames()
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "HomeManager",
+                            "Не удалось загрузить игры из Firebase",
+                            e
+                        )
+                        repository.getLocalGames()
+                    }
                 }
 
                 cachedGames = games
-                showGames(view, games)
+
+                // Показываем игры только если выбрана категория «Игры».
+                if (selectedCategory == "Игры") {
+                    showFilteredGames(view, games)
+                }
 
                 if (games.isEmpty()) {
                     Toast.makeText(
                         activity,
                         "Каталог игр пуст",
-                        Toast.LENGTH_LONG
+                        Toast.LENGTH_SHORT
                     ).show()
                 }
             } catch (e: Exception) {
                 android.util.Log.e(
                     "HomeManager",
-                    "Ошибка загрузки игр из Firebase",
+                    "Ошибка загрузки каталога игр",
                     e
                 )
 
                 Toast.makeText(
                     activity,
-                    "Не удалось загрузить каталог игр: ${e.localizedMessage}",
+                    "Не удалось загрузить каталог игр",
                     Toast.LENGTH_LONG
                 ).show()
             } finally {
@@ -200,10 +244,7 @@ class HomeManager(
         }
     }
 
-
-
-    // Показываем игры в сетке из двух колонок
-    private fun showGames(
+    private fun showFilteredGames(
         view: View,
         games: List<Game>
     ) {
@@ -211,18 +252,34 @@ class HomeManager(
             R.id.gamesRecyclerView
         ) ?: return
 
-        recyclerView.layoutManager = GridLayoutManager(activity, 2)
+        val query = currentQuery
 
-        if (recyclerView.layoutManager == null) {
-            recyclerView.layoutManager = GridLayoutManager(activity, 2)
+        val filteredGames = if (query.isBlank()) {
+            games
+        } else {
+            games.filter { game ->
+                game.title.contains(query, ignoreCase = true) ||
+                        game.genre.contains(query, ignoreCase = true) ||
+                        game.description.contains(query, ignoreCase = true)
+            }
         }
 
+        recyclerView.layoutManager = GridLayoutManager(activity, 2)
+
         recyclerView.adapter = GameAdapter(
-            games,
+            filteredGames,
             repository,
             activity
         ) { game ->
             onGameClick(game)
+        }
+
+        if (filteredGames.isEmpty()) {
+            Toast.makeText(
+                activity,
+                "Игры по запросу «$query» не найдены",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 }

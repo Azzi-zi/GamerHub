@@ -171,6 +171,11 @@ class MainActivity : AppCompatActivity() {
         postsManager.setOnPostClickListener { post ->
             openPostDetails(post)
         }
+        postsManager.setOnAuthorClickListener { authorId ->
+            if (authorId.isNotBlank()) {
+                openPublicProfile(authorId)
+            }
+        }
 
         // Создаём менеджеры после инициализации контейнера
         chatsManager = ChatsManager(this) { layoutId ->
@@ -386,6 +391,7 @@ class MainActivity : AppCompatActivity() {
 
         selectCategory(R.id.category_all)
     }
+
     private fun openPostDetails(post: Post) {
         openPage(R.layout.screen_post_details)
 
@@ -397,9 +403,44 @@ class MainActivity : AppCompatActivity() {
             onBack = {
                 openHomePage()
                 setActiveNav(findViewById(R.id.navHome))
+            },
+            onAuthorClick = { authorId ->
+                if (authorId.isNotBlank()) {
+                    openPublicProfile(authorId) {
+                        openPostDetails(post)
+                    }
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Профиль автора недоступен",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         ).setup(view)
     }
+
+    private fun openPublicProfile(
+        userId: String,
+        onBack: () -> Unit = {
+            openHomePage()
+            setActiveNav(findViewById(R.id.navHome))
+        }
+    ) {
+        openPage(R.layout.screen_public_profile)
+
+        val view = pageContainer.getChildAt(0)
+
+        PublicProfileManager(
+            activity = this,
+            userId = userId,
+            postsManager = postsManager,
+            onBack = onBack
+        ).setup(view)
+    }
+
+
+
     private fun openHomePage() {
         openPage(R.layout.screen_home)
 

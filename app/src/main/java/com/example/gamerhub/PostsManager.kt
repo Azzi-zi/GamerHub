@@ -27,6 +27,11 @@ class PostsManager(
 
     private var onPostClick: ((Post) -> Unit)? = null
 
+    private var onAuthorClick: ((String) -> Unit)? = null
+
+    fun setOnAuthorClickListener(listener: (String) -> Unit) {
+        onAuthorClick = listener
+    }
     fun setOnPostClickListener(listener: (Post) -> Unit) {
         onPostClick = listener
     }
@@ -90,7 +95,13 @@ class PostsManager(
     }
 
     // Загружаем публикации из Firestore
-    fun loadPosts(view: View, category: String = "Все") {
+
+    // Загружаем публикации с фильтрацией по категории и поисковому запросу.
+    fun loadPosts(
+        view: View,
+        category: String = "Все",
+        query: String = ""
+    ) {
         val container = view.findViewById<LinearLayout>(
             R.id.postsContainer
         ) ?: return
@@ -101,18 +112,43 @@ class PostsManager(
                     .get()
                     .await()
 
+                val searchText = query.trim()
+
                 val posts = snapshot.documents
                     .mapNotNull { document ->
-                        document.toObject(Post::class.java)?.copy(
-                            id = document.id
-                        )
+                        document.toObject(Post::class.java)
+                            ?.copy(id = document.id)
                     }
                     .filter { post ->
-                        category == "Все" ||
-                                post.postType.equals(
-                                    category,
-                                    ignoreCase = true
-                                )
+                        // Сначала проверяем категорию.
+                        val matchesCategory =
+                            category == "Все" ||
+                                    post.postType.equals(
+                                        category,
+                                        ignoreCase = true
+                                    )
+
+                        // Затем ищем совпадения в содержимом публикации.
+                        val searchableText = listOf(
+                            post.title,
+                            post.content,
+                            post.game,
+                            post.authorName,
+                            post.postType
+                        ) + post.gameTags +
+                                post.topicTags +
+                                post.tags
+
+                        val matchesQuery =
+                            searchText.isBlank() ||
+                                    searchableText.any { text ->
+                                        text.contains(
+                                            searchText,
+                                            ignoreCase = true
+                                        )
+                                    }
+
+                        matchesCategory && matchesQuery
                     }
                     .reversed()
 
@@ -120,11 +156,17 @@ class PostsManager(
 
                 if (posts.isEmpty()) {
                     val emptyText = TextView(activity).apply {
-                        text = "Публикаций пока нет"
+                        text = if (searchText.isNotBlank()) {
+                            "По запросу «$searchText» ничего не найдено"
+                        } else {
+                            "Публикаций пока нет"
+                        }
+
                         textSize = 15f
                         setTextColor(Color.LTGRAY)
                         setPadding(20, 24, 20, 24)
                     }
+
                     container.addView(emptyText)
                     return@launch
                 }
@@ -340,15 +382,35 @@ class PostsManager(
         )
 
         // Автор публикации
+
+        // Имя автора — кнопка перехода в профиль.
         val author = post.authorName.ifBlank {
             "Игрок GamerHub"
         }
 
-        addText(
-            "👤 $author",
-            12f,
-            Color.rgb(160, 160, 170)
-        )
+        val authorView = TextView(activity).apply {
+            text = "👤 $author"
+            textSize = 12f
+            setTextColor(Color.rgb(180, 140, 255))
+            setPadding(0, 4, 0, 4)
+            isClickable = true
+            isFocusable = true
+
+            setOnClickListener {
+                if (post.authorId.isNotBlank()) {
+                    onAuthorClick?.invoke(post.authorId)
+                } else {
+                    Toast.makeText(
+                        activity,
+                        "Профиль автора недоступен",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        textContainer.addView(authorView)
+
 
         // Теги публикации
         val tags = (post.gameTags + post.topicTags).distinct()
