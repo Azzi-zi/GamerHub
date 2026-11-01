@@ -261,6 +261,7 @@ class PublicProfileManager(
     }
 
 
+
     private fun loadProfile(view: View) {
         activity.lifecycleScope.launch {
             try {
@@ -278,6 +279,7 @@ class PublicProfileManager(
                     return@launch
                 }
 
+                // Имя и тег пользователя.
                 val username = document.getString("username")
                     ?.takeIf { it.isNotBlank() }
                     ?: "Игрок GamerHub"
@@ -291,50 +293,89 @@ class PublicProfileManager(
                 ).text = document.getString("tag")
                     ?: "@${username.lowercase().replace(" ", "_")}"
 
-                // Описание
-                val bio = document.getString("bio").orEmpty()
-
+                // Описание профиля.
                 view.findViewById<TextView>(
                     R.id.publicProfileBio
-                ).text = bio.ifBlank {
-                    "Пользователь пока ничего не рассказал о себе."
-                }
+                ).text = document.getString("bio").orEmpty()
+                    .ifBlank {
+                        "Пользователь пока ничего не рассказал о себе."
+                    }
 
-                // Роли пользователя
+                val density = activity.resources.displayMetrics.density
+
+                // Игровые роли.
+                val rolesContainer = view.findViewById<LinearLayout>(
+                    R.id.publicProfileRoles
+                )
+
+                rolesContainer.removeAllViews()
+
                 val roles = document.getString("roles")
                     .orEmpty()
                     .split("|")
                     .map { it.trim() }
                     .filter { it.isNotBlank() }
 
-                view.findViewById<TextView>(
-                    R.id.publicProfileRoles
-                ).text = roles.joinToString("  •  ")
-                    .ifBlank { "Роли не указаны" }
-
-                // Любимые игры
-                val favoriteGames = (
-                        document.get("favoriteGames") as? List<*>
-                        ).orEmpty().filterIsInstance<String>()
-
-                val gamesContainer = view.findViewById<LinearLayout>(
-                    R.id.publicProfileFavoriteGames
-                )
-
-                gamesContainer.removeAllViews()
-
-                if (favoriteGames.isEmpty()) {
-                    gamesContainer.addView(
+                if (roles.isEmpty()) {
+                    rolesContainer.addView(
                         TextView(activity).apply {
-                            text = "Любимые игры не указаны"
-                            textSize = 13f
+                            text = "Роли не указаны"
+                            textSize = 12f
                             setTextColor(Color.LTGRAY)
                         }
                     )
                 } else {
-                    val density = activity.resources.displayMetrics.density
+                    roles.forEach { role ->
+                        val roleView = TextView(activity).apply {
+                            text = role
+                            textSize = 12f
+                            setTextColor(Color.WHITE)
 
-                    favoriteGames.forEach { game ->
+                            setPadding(
+                                (12 * density).toInt(),
+                                (6 * density).toInt(),
+                                (12 * density).toInt(),
+                                (6 * density).toInt()
+                            )
+
+                            setBackgroundResource(
+                                R.drawable.bg_category_active
+                            )
+                        }
+
+                        val params = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            marginEnd = (8 * density).toInt()
+                        }
+
+                        rolesContainer.addView(roleView, params)
+                    }
+                }
+
+                // Любимые игры.
+                val games = (
+                        document.get("favoriteGames") as? List<*>
+                        ).orEmpty().filterIsInstance<String>()
+
+                val gamesContainer = view.findViewById<LinearLayout>(
+                    R.id.profileFavoriteGames
+                )
+
+                gamesContainer.removeAllViews()
+
+                if (games.isEmpty()) {
+                    gamesContainer.addView(
+                        TextView(activity).apply {
+                            text = "Пока не добавлено ни одной игры"
+                            textSize = 13f
+                            setTextColor(Color.LTGRAY)
+                            setPadding(0, 4, 0, 4)
+                        }
+                    )
+                } else {
+                    games.forEach { game ->
                         val gameView = TextView(activity).apply {
                             text = game
                             textSize = 13f
@@ -347,8 +388,8 @@ class PublicProfileManager(
                                 (9 * density).toInt()
                             )
 
-                            background = android.graphics.drawable
-                                .GradientDrawable().apply {
+                            background =
+                                android.graphics.drawable.GradientDrawable().apply {
                                     cornerRadius = 12 * density
                                     setColor(Color.rgb(26, 26, 32))
                                     setStroke(
@@ -358,20 +399,18 @@ class PublicProfileManager(
                                 }
                         }
 
-                        val params = android.widget.LinearLayout.LayoutParams(
-                            android.widget.LinearLayout.LayoutParams
-                                .MATCH_PARENT,
-                            android.widget.LinearLayout.LayoutParams
-                                .WRAP_CONTENT
+                        val params = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
                         ).apply {
-                            bottomMargin = (6 * density).toInt()
+                            marginEnd = (8 * density).toInt()
                         }
 
                         gamesContainer.addView(gameView, params)
                     }
                 }
 
-                // Аватар
+                // Аватар.
                 val avatarUrl = document.getString("avatarUrl")
                     ?: document.getString("avatarUri")
                     ?: ""
@@ -392,7 +431,7 @@ class PublicProfileManager(
                     )
                 }
 
-                // Обложка — в компактном контейнере, а не на весь экран
+                // Обложка.
                 val cover = view.findViewById<ImageView>(
                     R.id.publicProfileCover
                 )
@@ -400,8 +439,6 @@ class PublicProfileManager(
                 val coverUrl = document.getString("coverUrl").orEmpty()
 
                 if (coverUrl.startsWith("https://")) {
-                    cover.visibility = View.VISIBLE
-
                     Glide.with(cover)
                         .load(coverUrl)
                         .placeholder(
@@ -418,12 +455,40 @@ class PublicProfileManager(
                         .into(cover)
                 } else {
                     Glide.with(cover).clear(cover)
+
                     cover.setImageDrawable(
                         android.graphics.drawable.ColorDrawable(
                             Color.rgb(26, 26, 32)
                         )
                     )
                 }
+
+                // Количество публикаций.
+                val posts = db.collection("posts")
+                    .whereEqualTo("authorId", userId)
+                    .get()
+                    .await()
+
+                view.findViewById<TextView>(
+                    R.id.profilePostsCount
+                ).text = posts.size().toString()
+
+                // Суммарное количество лайков публикаций.
+                var totalLikes = 0
+
+                for (post in posts.documents) {
+                    val likes = db.collection("posts")
+                        .document(post.id)
+                        .collection("likes")
+                        .get()
+                        .await()
+
+                    totalLikes += likes.size()
+                }
+
+                view.findViewById<TextView>(
+                    R.id.publicProfileLikesCount
+                ).text = totalLikes.toString()
 
             } catch (e: Exception) {
                 Log.e(

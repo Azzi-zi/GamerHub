@@ -64,16 +64,17 @@
                 android:id="@+id/profileCoverContainer"
                 android:layout_width="match_parent"
                 android:layout_height="190dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp">
+                android:background="@drawable/bg_profile_cover"
+                android:clipToOutline="true"
+                android:padding="2dp">
 
                 <ImageView
                     android:id="@+id/profileCover"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="#1A1A20"
-                    android:contentDescription="Фоновое изображение профиля"
-                    android:scaleType="centerCrop" />
+                    android:scaleType="centerCrop"
+                    android:clipToOutline="true"
+                    android:contentDescription="Обложка профиля" />
 
                 <!-- Затемнение для читаемости текста -->
                 <View
@@ -97,7 +98,8 @@
                     android:paddingEnd="12dp"
                     android:text="📷 Обложка"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    />
 
             </FrameLayout>
 
