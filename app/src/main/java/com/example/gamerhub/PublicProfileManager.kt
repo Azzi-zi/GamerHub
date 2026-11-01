@@ -17,7 +17,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-
+import android.widget.LinearLayout
 class PublicProfileManager(
     private val activity: AppCompatActivity,
     private val userId: String,
@@ -260,25 +260,19 @@ class PublicProfileManager(
             ?: "Игрок GamerHub"
     }
 
+
     private fun loadProfile(view: View) {
         activity.lifecycleScope.launch {
             try {
-                var document = db.collection("publicProfiles")
+                val document = db.collection("publicProfiles")
                     .document(userId)
                     .get()
                     .await()
 
                 if (!document.exists()) {
-                    document = db.collection("users")
-                        .document(userId)
-                        .get()
-                        .await()
-                }
-
-                if (!document.exists()) {
                     Toast.makeText(
                         activity,
-                        "Профиль пользователя не найден",
+                        "Публичный профиль пользователя не найден",
                         Toast.LENGTH_SHORT
                     ).show()
                     return@launch
@@ -292,20 +286,21 @@ class PublicProfileManager(
                     R.id.publicProfileUsername
                 ).text = username
 
-                val tag = document.getString("tag")
-                    ?: "@${username.lowercase().replace(" ", "_")}"
-
                 view.findViewById<TextView>(
                     R.id.publicProfileTag
-                ).text = tag
+                ).text = document.getString("tag")
+                    ?: "@${username.lowercase().replace(" ", "_")}"
+
+                // Описание
+                val bio = document.getString("bio").orEmpty()
 
                 view.findViewById<TextView>(
                     R.id.publicProfileBio
-                ).text = document.getString("bio").orEmpty()
-                    .ifBlank {
-                        "Пользователь пока ничего не рассказал о себе."
-                    }
+                ).text = bio.ifBlank {
+                    "Пользователь пока ничего не рассказал о себе."
+                }
 
+                // Роли пользователя
                 val roles = document.getString("roles")
                     .orEmpty()
                     .split("|")
@@ -315,7 +310,68 @@ class PublicProfileManager(
                 view.findViewById<TextView>(
                     R.id.publicProfileRoles
                 ).text = roles.joinToString("  •  ")
+                    .ifBlank { "Роли не указаны" }
 
+                // Любимые игры
+                val favoriteGames = (
+                        document.get("favoriteGames") as? List<*>
+                        ).orEmpty().filterIsInstance<String>()
+
+                val gamesContainer = view.findViewById<LinearLayout>(
+                    R.id.publicProfileFavoriteGames
+                )
+
+                gamesContainer.removeAllViews()
+
+                if (favoriteGames.isEmpty()) {
+                    gamesContainer.addView(
+                        TextView(activity).apply {
+                            text = "Любимые игры не указаны"
+                            textSize = 13f
+                            setTextColor(Color.LTGRAY)
+                        }
+                    )
+                } else {
+                    val density = activity.resources.displayMetrics.density
+
+                    favoriteGames.forEach { game ->
+                        val gameView = TextView(activity).apply {
+                            text = game
+                            textSize = 13f
+                            setTextColor(Color.WHITE)
+
+                            setPadding(
+                                (12 * density).toInt(),
+                                (9 * density).toInt(),
+                                (12 * density).toInt(),
+                                (9 * density).toInt()
+                            )
+
+                            background = android.graphics.drawable
+                                .GradientDrawable().apply {
+                                    cornerRadius = 12 * density
+                                    setColor(Color.rgb(26, 26, 32))
+                                    setStroke(
+                                        (1 * density).toInt(),
+                                        Color.rgb(55, 52, 72)
+                                    )
+                                }
+                        }
+
+                        val params = android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams
+                                .MATCH_PARENT,
+                            android.widget.LinearLayout.LayoutParams
+                                .WRAP_CONTENT
+                        ).apply {
+                            bottomMargin = (6 * density).toInt()
+                        }
+
+                        gamesContainer.addView(gameView, params)
+                    }
+                }
+
+                // Аватар
                 val avatarUrl = document.getString("avatarUrl")
                     ?: document.getString("avatarUri")
                     ?: ""
@@ -325,7 +381,7 @@ class PublicProfileManager(
                 )
 
                 if (avatarUrl.startsWith("https://")) {
-                    Glide.with(activity)
+                    Glide.with(avatar)
                         .load(avatarUrl)
                         .placeholder(R.drawable.ic_launcher_foreground)
                         .error(R.drawable.ic_launcher_foreground)
@@ -335,6 +391,40 @@ class PublicProfileManager(
                         R.drawable.ic_launcher_foreground
                     )
                 }
+
+                // Обложка — в компактном контейнере, а не на весь экран
+                val cover = view.findViewById<ImageView>(
+                    R.id.publicProfileCover
+                )
+
+                val coverUrl = document.getString("coverUrl").orEmpty()
+
+                if (coverUrl.startsWith("https://")) {
+                    cover.visibility = View.VISIBLE
+
+                    Glide.with(cover)
+                        .load(coverUrl)
+                        .placeholder(
+                            android.graphics.drawable.ColorDrawable(
+                                Color.rgb(26, 26, 32)
+                            )
+                        )
+                        .error(
+                            android.graphics.drawable.ColorDrawable(
+                                Color.rgb(26, 26, 32)
+                            )
+                        )
+                        .centerCrop()
+                        .into(cover)
+                } else {
+                    Glide.with(cover).clear(cover)
+                    cover.setImageDrawable(
+                        android.graphics.drawable.ColorDrawable(
+                            Color.rgb(26, 26, 32)
+                        )
+                    )
+                }
+
             } catch (e: Exception) {
                 Log.e(
                     "PublicProfileManager",
@@ -350,6 +440,7 @@ class PublicProfileManager(
             }
         }
     }
+
 
     fun stopListening() {
         followersListener?.remove()

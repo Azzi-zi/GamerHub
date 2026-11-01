@@ -1228,11 +1228,16 @@ class ProfileManager(
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
 
+
                     val publicProfile = hashMapOf<String, Any>(
                         "uid" to uid,
                         "username" to username,
-                        "tag" to tag
+                        "tag" to tag,
+                        "bio" to bio,
+                        "roles" to roles,
+                        "favoriteGames" to favoriteGames
                     )
+
 
                     batch.set(
                         db.collection("users").document(uid),
