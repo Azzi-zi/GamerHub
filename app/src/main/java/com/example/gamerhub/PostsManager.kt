@@ -25,6 +25,15 @@ class PostsManager(
 ) {
 
     private val db = FirebaseFirestore.getInstance()
+    // Кэш URL аватаров авторов.
+    private val authorAvatarCache = mutableMapOf<String, String>()
+
+    // Авторы, для которых уже выполняется запрос.
+    private val authorAvatarRequests = mutableSetOf<String>()
+
+    // Ожидающие обновления ImageView.
+    private val authorAvatarCallbacks =
+        mutableMapOf<String, MutableList<(String) -> Unit>>()
 
     private var onPostClick: ((Post) -> Unit)? = null
 
@@ -35,6 +44,65 @@ class PostsManager(
     }
     fun setOnPostClickListener(listener: (Post) -> Unit) {
         onPostClick = listener
+    }
+    private fun loadAuthorAvatar(
+        authorId: String,
+        callback: (String) -> Unit
+    ) {
+        if (authorId.isBlank()) {
+            callback("")
+            return
+        }
+
+        // Если URL уже есть в кэше, сразу используем его.
+        if (authorAvatarCache.containsKey(authorId)) {
+            callback(authorAvatarCache[authorId].orEmpty())
+            return
+        }
+
+        // Добавляем ImageView в список ожидающих обновления.
+        val callbacks = authorAvatarCallbacks.getOrPut(authorId) {
+            mutableListOf()
+        }
+
+        callbacks.add(callback)
+
+        // Если запрос уже выполняется, второй не запускаем.
+        if (!authorAvatarRequests.add(authorId)) {
+            return
+        }
+
+        activity.lifecycleScope.launch {
+            val avatarUrl = try {
+                val document = db.collection("publicProfiles")
+                    .document(authorId)
+                    .get()
+                    .await()
+
+                document.getString("avatarUrl")
+                    ?: document.getString("avatarUri")
+                    ?: ""
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "PostsManager",
+                    "Не удалось загрузить аватар автора",
+                    e
+                )
+                ""
+            }
+
+            authorAvatarCache[authorId] = avatarUrl
+            authorAvatarRequests.remove(authorId)
+
+            // Обновляем все карточки этого автора.
+            val waitingCallbacks =
+                authorAvatarCallbacks.remove(authorId).orEmpty()
+
+            waitingCallbacks.forEach { update ->
+                update(avatarUrl)
+            }
+        }
     }
 
     fun loadPostsForGame(view: View, gameTitle: String) {
@@ -608,33 +676,108 @@ class PostsManager(
 
         // Автор публикации
 
-        // Имя автора — кнопка перехода в профиль.
         val author = post.authorName.ifBlank {
             "Игрок GamerHub"
         }
 
-        val authorView = TextView(activity).apply {
-            text = "👤 $author"
-            textSize = 12f
-            setTextColor(Color.rgb(180, 140, 255))
-            setPadding(0, 4, 0, 4)
-            isClickable = true
-            isFocusable = true
+        val authorContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 8, 0, 8)
+        }
 
-            setOnClickListener {
-                if (post.authorId.isNotBlank()) {
-                    onAuthorClick?.invoke(post.authorId)
-                } else {
-                    Toast.makeText(
-                        activity,
-                        "Профиль автора недоступен",
-                        Toast.LENGTH_SHORT
-                    ).show()
+        val authorAvatar = ImageView(activity).apply {
+            val avatarSize =
+                (40 * resources.displayMetrics.density).toInt()
+
+            layoutParams = LinearLayout.LayoutParams(
+                avatarSize,
+                avatarSize
+            )
+
+            scaleType = ImageView.ScaleType.CENTER_CROP
+
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(45, 40, 60))
+            }
+
+            clipToOutline = true
+
+            setImageResource(R.drawable.ic_launcher_foreground)
+        }
+
+        val authorView = TextView(activity).apply {
+            text = author
+            textSize = 13f
+            setTextColor(Color.rgb(180, 140, 255))
+            setTypeface(null, Typeface.BOLD)
+
+            setPadding(
+                (10 * resources.displayMetrics.density).toInt(),
+                0,
+                0,
+                0
+            )
+        }
+
+        val openAuthorProfile = {
+            if (post.authorId.isNotBlank()) {
+                onAuthorClick?.invoke(post.authorId)
+            } else {
+                Toast.makeText(
+                    activity,
+                    "Профиль автора недоступен",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        authorContainer.setOnClickListener {
+            openAuthorProfile()
+        }
+
+        authorAvatar.setOnClickListener {
+            openAuthorProfile()
+        }
+
+        authorView.setOnClickListener {
+            openAuthorProfile()
+        }
+
+// Сначала используем URL, сохранённый непосредственно в публикации.
+        if (post.authorAvatarUrl.startsWith("https://")) {
+
+            Glide.with(activity)
+                .load(post.authorAvatarUrl)
+                .placeholder(R.drawable.ic_launcher_foreground)
+                .error(R.drawable.ic_launcher_foreground)
+                .circleCrop()
+                .into(authorAvatar)
+
+        } else {
+
+            // Для старых публикаций загружаем аватар из publicProfiles.
+            loadAuthorAvatar(post.authorId) { avatarUrl ->
+
+                if (avatarUrl.startsWith("https://")) {
+                    Glide.with(activity)
+                        .load(avatarUrl)
+                        .placeholder(R.drawable.ic_launcher_foreground)
+                        .error(R.drawable.ic_launcher_foreground)
+                        .circleCrop()
+                        .into(authorAvatar)
                 }
             }
         }
 
-        textContainer.addView(authorView)
+        authorContainer.addView(authorAvatar)
+        authorContainer.addView(authorView)
+
+        textContainer.addView(authorContainer)
+
+
+
 
 
         // Теги публикации

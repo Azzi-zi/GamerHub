@@ -12,5 +12,6 @@ data class Post(
     val authorName: String = "",
     val gameTags: List<String> = emptyList(),
     val topicTags: List<String> = emptyList(),
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val authorAvatarUrl: String = "",
 )

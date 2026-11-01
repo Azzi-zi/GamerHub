@@ -11,7 +11,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-
+import android.graphics.drawable.GradientDrawable
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 class PostDetailsManager(
     private val activity: AppCompatActivity,
     private val post: Post,
@@ -83,16 +86,19 @@ class PostDetailsManager(
         }
 
         // Автор
+        // Автор публикации
+
         val authorView = view.findViewById<TextView>(
             R.id.postDetailsAuthor
         )
 
-        authorView.text = "Автор: ${post.authorName}"
-        authorView.setTextColor(
-            android.graphics.Color.rgb(180, 140, 255)
+        val authorAvatar = view.findViewById<ImageView>(
+            R.id.postDetailsAuthorAvatar
         )
-        authorView.isClickable = true
-        authorView.isFocusable = true
+
+        authorView.text = post.authorName.ifBlank {
+            "Игрок GamerHub"
+        }
 
         authorView.setOnClickListener {
             if (post.authorId.isNotBlank()) {
@@ -103,6 +109,65 @@ class PostDetailsManager(
                     "Профиль автора недоступен",
                     Toast.LENGTH_SHORT
                 ).show()
+            }
+        }
+
+// Заглушка аватара.
+        authorAvatar.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(android.graphics.Color.rgb(45, 40, 60))
+        }
+
+        authorAvatar.clipToOutline = true
+        authorAvatar.setImageResource(
+            R.drawable.ic_launcher_foreground
+        )
+
+// Переход в профиль по нажатию на аватар.
+        authorAvatar.setOnClickListener {
+            if (post.authorId.isNotBlank()) {
+                onAuthorClick(post.authorId)
+            }
+        }
+
+// Загружаем аватар.
+        activity.lifecycleScope.launch {
+
+            val avatarUrl = try {
+
+                if (post.authorAvatarUrl.startsWith("https://")) {
+                    post.authorAvatarUrl
+                } else if (post.authorId.isNotBlank()) {
+
+                    val document = db.collection("publicProfiles")
+                        .document(post.authorId)
+                        .get()
+                        .await()
+
+                    document.getString("avatarUrl")
+                        ?: document.getString("avatarUri")
+                        ?: ""
+
+                } else {
+                    ""
+                }
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "PostDetailsManager",
+                    "Ошибка загрузки аватара автора",
+                    e
+                )
+                ""
+            }
+
+            if (avatarUrl.startsWith("https://")) {
+                Glide.with(activity)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .circleCrop()
+                    .into(authorAvatar)
             }
         }
 

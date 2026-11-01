@@ -850,6 +850,10 @@ class CreatePostManager(
                         ?.takeIf { it.isNotBlank() }
                     ?: "Игрок GamerHub"
 
+                val avatarUrl = profileSnapshot.getString("avatarUrl")
+                    ?: profileSnapshot.getString("avatarUri")
+                    ?: ""
+
                 // Загружаем новую обложку или оставляем старую.
                 val imageUrl = if (imageUri != null) {
 
@@ -915,6 +919,7 @@ class CreatePostManager(
                     // Создаём новую публикацию.
                     postData["authorId"] = user.uid
                     postData["authorName"] = username
+                    postData["authorAvatarUrl"] = avatarUrl
                     postData["createdAt"] = FieldValue.serverTimestamp()
 
                     withContext(Dispatchers.IO) {
