@@ -310,7 +310,7 @@ class MainActivity : AppCompatActivity() {
     // OPEN PAGE
     // ============================================================
 
-    private fun openPage(layoutId: Int) {
+    private fun openPage(layoutId: Int, postToEdit: Post? = null) {
         pageContainer.removeAllViews()
 
         val view = LayoutInflater.from(this).inflate(
@@ -326,7 +326,9 @@ class MainActivity : AppCompatActivity() {
 
         // Настройка экрана создания публикации
         if (layoutId == R.layout.screen_create) {
-            createPostManager.setup(view)
+            createPostManager.setup(view, postToEdit) { updatedPost ->
+                openPostDetails(updatedPost)
+            }
         }
 
         if (layoutId == R.layout.screen_notifications) {
@@ -427,6 +429,9 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
                 }
+            } ,
+            onEditClick = { postToEdit ->
+                openPage(R.layout.screen_create, postToEdit)
             }
         ).setup(view)
     }

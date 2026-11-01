@@ -16,8 +16,8 @@ class PostDetailsManager(
     private val activity: AppCompatActivity,
     private val post: Post,
     private val onBack: () -> Unit,
-    private val onAuthorClick: (String) -> Unit = {}
-
+    private val onAuthorClick: (String) -> Unit = {},
+    private val onEditClick: (Post) -> Unit = {}
 ) {
 
     private val db = FirebaseFirestore.getInstance()
@@ -34,6 +34,21 @@ class PostDetailsManager(
             R.id.postDetailsBackButton
         ).setOnClickListener {
             onBack()
+        }
+
+        // Кнопка редактирования доступна только автору публикации
+        val editButton = view.findViewById<TextView>(
+            R.id.postDetailsEditButton
+        )
+
+        if (post.authorId == FirebaseAuth.getInstance().currentUser?.uid) {
+            editButton.visibility = View.VISIBLE
+
+            editButton.setOnClickListener {
+                onEditClick(post)
+            }
+        } else {
+            editButton.visibility = View.GONE
         }
 
         // Обложка публикации
@@ -68,8 +83,6 @@ class PostDetailsManager(
         }
 
         // Автор
-
-        // Имя автора открывает его публичный профиль.
         val authorView = view.findViewById<TextView>(
             R.id.postDetailsAuthor
         )
@@ -94,9 +107,8 @@ class PostDetailsManager(
         }
 
         // Текст публикации
-        view.findViewById<TextView>(
-            R.id.postDetailsContent
-        ).text = post.content
+        // Текст публикации
+        view.findViewById<TextView>(R.id.postDetailsContent).text = post.content
 
         // Теги
         val tags = (
@@ -111,6 +123,7 @@ class PostDetailsManager(
 
         // Подключаем лайки
         setupLikes(view)
+
         // Подключаем комментарии
         commentsManager = CommentsManager(
             activity = activity,
@@ -183,7 +196,7 @@ class PostDetailsManager(
                 it.id == uid
             }
 
-            // Сердце и количество отображаются в одной кнопке
+            // Сердце и количество
             likeButton.text = if (isLiked) {
                 "❤️ $count"
             } else {
@@ -207,11 +220,13 @@ class PostDetailsManager(
             myLike.get()
                 .addOnSuccessListener { document ->
 
-
                     val operation = if (document.exists()) {
-                        // Снимаем лайк — уведомление не создаём
+
+                        // Снимаем лайк
                         myLike.delete()
+
                     } else {
+
                         // Сначала сохраняем лайк
                         myLike.set(
                             mapOf(
@@ -219,11 +234,11 @@ class PostDetailsManager(
                                 "createdAt" to FieldValue.serverTimestamp()
                             )
                         ).addOnSuccessListener {
-                            // Уведомление создаём только после успешного сохранения лайка
+
+                            // Создаём уведомление после сохранения лайка
                             createLikeNotification(uid)
                         }
                     }
-
 
                     operation
                         .addOnFailureListener {
@@ -252,6 +267,7 @@ class PostDetailsManager(
     }
 
     private fun createLikeNotification(actorUid: String) {
+
         // Не уведомляем автора о его собственном лайке
         if (post.authorId.isBlank() || post.authorId == actorUid) {
             return
@@ -285,7 +301,6 @@ class PostDetailsManager(
                 ).show()
             }
     }
-
 
     // Отключаем слушатель при закрытии страницы
     fun cleanup() {

@@ -1,4 +1,3 @@
-
 package com.example.gamerhub
 
 import android.content.Intent
@@ -32,11 +31,17 @@ import kotlinx.coroutines.withContext
 
 class CreatePostManager(
     private val activity: AppCompatActivity
-
 ) {
 
     private var currentView: View? = null
     private var selectedImageUri: Uri? = null
+
+    // Публикация, которую сейчас редактируем.
+    // Если null — создаём новую.
+    private var editingPost: Post? = null
+
+    // Действие после успешного сохранения изменений.
+    private var onPostSaved: (Post) -> Unit = {}
 
     private val db = FirebaseFirestore.getInstance()
 
@@ -111,9 +116,61 @@ class CreatePostManager(
             }
         }
 
-    // Настройка экрана создания публикации
-    fun setup(view: View) {
+    // Настройка экрана создания или редактирования публикации
+    fun setup(
+        view: View,
+        postToEdit: Post? = null,
+        onSaved: (Post) -> Unit = {}
+    ) {
         currentView = view
+        editingPost = postToEdit
+        onPostSaved = onSaved
+
+        selectedImageUri = null
+        selectedGameTags.clear()
+        selectedTopicTags.clear()
+
+        val screenTitle = view.findViewById<TextView>(
+            R.id.postScreenTitle
+        )
+
+        screenTitle.text = if (postToEdit != null) {
+            "Редактировать публикацию"
+        } else {
+            "Создать публикацию"
+        }
+        val publishButton = view.findViewById<Button>(
+            R.id.publishButton
+        )
+
+        publishButton.text = if (postToEdit != null) {
+            "Сохранить изменения"
+        } else {
+            "➤  Опубликовать"
+        }
+
+        // Если редактируем публикацию — заполняем поля.
+        postToEdit?.let { post ->
+
+            view.findViewById<EditText>(
+                R.id.postTitle
+            ).setText(post.title)
+
+            view.findViewById<EditText>(
+                R.id.postContent
+            ).setText(post.content)
+
+            selectedGameTags.addAll(post.gameTags)
+            selectedTopicTags.addAll(post.topicTags)
+
+            view.findViewById<Button>(
+                R.id.publishButton
+            ).text = "Сохранить изменения"
+
+            if (post.imageUrl.isNotBlank()) {
+                showExistingImagePreview(post.imageUrl)
+            }
+        }
 
         setupGameSpinner(view)
         setupPostTypeSpinner(view)
@@ -133,9 +190,9 @@ class CreatePostManager(
         updateTagsHint(view)
     }
 
-    // Загрузка списка игр
-    // Загружаем список игр напрямую из Firestore
+    // Загрузка списка игр из Firestore
     private fun setupGameSpinner(view: View) {
+
         val spinner = view.findViewById<Spinner>(
             R.id.postGameSpinner
         )
@@ -165,19 +222,23 @@ class CreatePostManager(
                     android.R.layout.simple_spinner_item,
                     gameTitles
                 ) {
+
                     private fun createGameTextView(
                         convertView: View?,
                         paddingStart: Int,
                         paddingTop: Int
                     ): TextView {
+
                         return (convertView as? TextView
                             ?: TextView(activity)).apply {
+
                             setPadding(
                                 paddingStart,
                                 paddingTop,
                                 paddingStart,
                                 paddingTop
                             )
+
                             textSize = 15f
                             setTextColor(Color.WHITE)
                             gravity = Gravity.CENTER_VERTICAL
@@ -189,6 +250,7 @@ class CreatePostManager(
                         convertView: View?,
                         parent: ViewGroup
                     ): View {
+
                         return createGameTextView(
                             convertView,
                             12,
@@ -203,12 +265,15 @@ class CreatePostManager(
                         convertView: View?,
                         parent: ViewGroup
                     ): View {
+
                         return createGameTextView(
                             convertView,
                             20,
                             14
                         ).apply {
+
                             text = getItem(position)
+
                             setBackgroundColor(
                                 Color.rgb(30, 30, 38)
                             )
@@ -217,6 +282,16 @@ class CreatePostManager(
                 }
 
                 spinner.adapter = adapter
+
+                // При редактировании выбираем прежнюю игру.
+                editingPost?.let { post ->
+
+                    val position = adapter.getPosition(post.game)
+
+                    if (position >= 0) {
+                        spinner.setSelection(position)
+                    }
+                }
 
                 spinner.setPopupBackgroundDrawable(
                     ColorDrawable(Color.rgb(30, 30, 38))
@@ -244,6 +319,7 @@ class CreatePostManager(
                 refreshTags()
 
             } catch (e: Exception) {
+
                 android.util.Log.e(
                     "CreatePostManager",
                     "Не удалось загрузить игры из Firestore",
@@ -256,8 +332,10 @@ class CreatePostManager(
             }
         }
     }
+
     // Настройка списка типов публикаций
     private fun setupPostTypeSpinner(view: View) {
+
         val spinner = view.findViewById<Spinner>(
             R.id.postTypeSpinner
         )
@@ -275,11 +353,13 @@ class CreatePostManager(
             android.R.layout.simple_spinner_item,
             postTypes
         ) {
+
             override fun getView(
                 position: Int,
                 convertView: View?,
                 parent: ViewGroup
             ): View {
+
                 val textView = super.getView(
                     position,
                     convertView,
@@ -288,6 +368,7 @@ class CreatePostManager(
 
                 textView.setTextColor(Color.WHITE)
                 textView.textSize = 15f
+
                 return textView
             }
 
@@ -296,6 +377,7 @@ class CreatePostManager(
                 convertView: View?,
                 parent: ViewGroup
             ): View {
+
                 val textView = super.getDropDownView(
                     position,
                     convertView,
@@ -303,9 +385,11 @@ class CreatePostManager(
                 ) as TextView
 
                 textView.setTextColor(Color.WHITE)
+
                 textView.setBackgroundColor(
                     Color.parseColor("#201F2D")
                 )
+
                 textView.textSize = 15f
                 textView.setPadding(24, 24, 24, 24)
 
@@ -318,10 +402,18 @@ class CreatePostManager(
         )
 
         spinner.adapter = adapter
-        spinner.setSelection(0)
+
+        // Восстанавливаем прежний тип публикации.
+        val savedType = editingPost?.postType
+        val savedPosition = postTypes.indexOf(savedType)
+
+        spinner.setSelection(
+            if (savedPosition >= 0) savedPosition else 0
+        )
 
         spinner.onItemSelectedListener =
             object : android.widget.AdapterView.OnItemSelectedListener {
+
                 override fun onItemSelected(
                     parent: android.widget.AdapterView<*>?,
                     itemView: View?,
@@ -341,6 +433,7 @@ class CreatePostManager(
 
     // Обновляем доступные теги при выборе игры или типа публикации
     private fun refreshTags() {
+
         val view = currentView ?: return
 
         val selectedGame = view.findViewById<Spinner>(
@@ -366,7 +459,7 @@ class CreatePostManager(
         availableTopicTags = topicTagOptions[selectedType]
             ?: emptyList()
 
-        // Убираем выбранные теги, которых больше нет в списке
+        // Убираем выбранные теги, которых больше нет в списке.
         selectedGameTags.retainAll(availableGameTags.toSet())
         selectedTopicTags.retainAll(availableTopicTags.toSet())
 
@@ -376,6 +469,7 @@ class CreatePostManager(
 
     // Рисуем группы тегов
     private fun renderTags() {
+
         val view = currentView ?: return
 
         val container = view.findViewById<LinearLayout>(
@@ -399,13 +493,13 @@ class CreatePostManager(
         )
     }
 
-
     private fun addTagSection(
         container: LinearLayout,
         sectionTitle: String,
         tags: List<String>,
         selectedTags: MutableSet<String>
     ) {
+
         if (tags.isEmpty()) return
 
         val title = TextView(activity).apply {
@@ -420,6 +514,7 @@ class CreatePostManager(
         // Контейнер для строк тегов.
         val tagsLayout = android.widget.LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
+
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -432,18 +527,21 @@ class CreatePostManager(
         var currentRow = createTagRow()
         tagsLayout.addView(currentRow)
 
-        val availableWidth = activity.resources.displayMetrics.widthPixels -
-                (40 * activity.resources.displayMetrics.density).toInt()
+        val availableWidth =
+            activity.resources.displayMetrics.widthPixels -
+                    (40 * activity.resources.displayMetrics.density).toInt()
 
         var usedWidth = 0
 
         tags.forEach { tag ->
+
             val chip = createTagChip(
                 tag,
                 selectedTags.contains(tag)
             )
 
             chip.setOnClickListener {
+
                 if (selectedTags.contains(tag)) {
                     selectedTags.remove(tag)
                 } else {
@@ -454,8 +552,9 @@ class CreatePostManager(
                 updateTagsHint(currentView)
             }
 
-            // Измеряем реальную ширину тега.
+            // Измеряем примерную ширину тега.
             val density = activity.resources.displayMetrics.density
+
             val chipWidth = (
                     tag.length * 8.5f +
                             if (selectedTags.contains(tag)) 48f else 36f
@@ -480,9 +579,12 @@ class CreatePostManager(
     }
 
     private fun createTagRow(): LinearLayout {
+
         return LinearLayout(activity).apply {
+
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.START
+
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -491,6 +593,7 @@ class CreatePostManager(
     }
 
     private fun currentRowTagWidth(row: LinearLayout): Int {
+
         var width = 0
 
         for (i in 0 until row.childCount) {
@@ -505,9 +608,12 @@ class CreatePostManager(
         tag: String,
         isSelected: Boolean
     ): TextView {
+
         val background = GradientDrawable().apply {
+
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 40f
+
             setColor(
                 if (isSelected) {
                     Color.parseColor("#8055E8")
@@ -515,6 +621,7 @@ class CreatePostManager(
                     Color.parseColor("#252431")
                 }
             )
+
             setStroke(
                 1,
                 if (isSelected) {
@@ -526,6 +633,7 @@ class CreatePostManager(
         }
 
         return TextView(activity).apply {
+
             text = if (isSelected) "✓ $tag" else tag
             textSize = 13f
             setTextColor(Color.WHITE)
@@ -542,6 +650,7 @@ class CreatePostManager(
     }
 
     private fun updateTagsHint(view: View?) {
+
         val hint = view?.findViewById<TextView>(
             R.id.postTagsHint
         ) ?: return
@@ -549,6 +658,7 @@ class CreatePostManager(
         val count = selectedGameTags.size + selectedTopicTags.size
 
         hint.text = when {
+
             availableGameTags.isEmpty() &&
                     availableTopicTags.isEmpty() ->
                 "Сначала выбери игру и тип публикации"
@@ -561,8 +671,9 @@ class CreatePostManager(
         }
     }
 
-    // Предварительный просмотр изображения
+    // Предварительный просмотр нового изображения
     private fun showImagePreview(uri: Uri) {
+
         val view = currentView ?: return
 
         val imageArea = view.findViewById<FrameLayout>(
@@ -572,16 +683,20 @@ class CreatePostManager(
         val placeholder = imageArea.findViewById<View>(
             R.id.imageUploadPlaceholder
         )
+
         placeholder?.visibility = View.GONE
 
         val preview = imageArea.findViewWithTag<ImageView>(
             "post_image_preview"
         ) ?: ImageView(activity).apply {
+
             tag = "post_image_preview"
+
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
+
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
@@ -596,8 +711,48 @@ class CreatePostManager(
         preview.bringToFront()
     }
 
-    // Проверяем данные и публикуем запись
+    // Показываем старую обложку публикации при редактировании.
+    private fun showExistingImagePreview(imageUrl: String) {
+
+        val view = currentView ?: return
+
+        val imageArea = view.findViewById<FrameLayout>(
+            R.id.imageUploadArea
+        )
+
+        imageArea.findViewById<View>(
+            R.id.imageUploadPlaceholder
+        )?.visibility = View.GONE
+
+        val preview = imageArea.findViewWithTag<ImageView>(
+            "post_image_preview"
+        ) ?: ImageView(activity).apply {
+
+            tag = "post_image_preview"
+
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        if (preview.parent == null) {
+            imageArea.addView(preview)
+        }
+
+        Glide.with(activity)
+            .load(imageUrl)
+            .centerCrop()
+            .into(preview)
+
+        preview.bringToFront()
+    }
+
+    // Проверяем данные и создаём или обновляем публикацию.
     private fun publishPost() {
+
         val view = currentView ?: return
 
         val title = view.findViewById<EditText>(
@@ -617,10 +772,20 @@ class CreatePostManager(
         ).selectedItem?.toString().orEmpty()
 
         val imageUri = selectedImageUri
+        val postBeingEdited = editingPost
         val user = FirebaseAuth.getInstance().currentUser
 
         if (user == null) {
             showMessage("Сначала войди в аккаунт")
+            return
+        }
+
+        // Редактировать можно только собственную публикацию.
+        if (
+            postBeingEdited != null &&
+            postBeingEdited.authorId != user.uid
+        ) {
+            showMessage("Можно редактировать только свои публикации")
             return
         }
 
@@ -649,7 +814,9 @@ class CreatePostManager(
             return
         }
 
-        if (imageUri == null) {
+        // Для новой публикации изображение обязательно.
+        // При редактировании можно оставить старую обложку.
+        if (imageUri == null && postBeingEdited == null) {
             showMessage("Сначала выбери изображение")
             return
         }
@@ -662,9 +829,12 @@ class CreatePostManager(
         publishButton.text = "Загрузка..."
 
         activity.lifecycleScope.launch {
+
             try {
-                // Получаем username текущего пользователя из publicProfiles
+
+                // Получаем username текущего пользователя.
                 val profileSnapshot = withContext(Dispatchers.IO) {
+
                     Tasks.await(
                         db.collection("publicProfiles")
                             .document(user.uid)
@@ -679,91 +849,144 @@ class CreatePostManager(
                         ?.trim()
                         ?.takeIf { it.isNotBlank() }
                     ?: "Игрок GamerHub"
-                // Загружаем изображение в Supabase
-                val imageUrl = withContext(Dispatchers.IO) {
-                    SupabaseStorageManager.uploadImage(
-                        activity,
-                        imageUri
-                    )
+
+                // Загружаем новую обложку или оставляем старую.
+                val imageUrl = if (imageUri != null) {
+
+                    withContext(Dispatchers.IO) {
+                        SupabaseStorageManager.uploadImage(
+                            activity,
+                            imageUri
+                        )
+                    }
+
+                } else {
+                    postBeingEdited?.imageUrl.orEmpty()
                 }
 
+                val gameTags = selectedGameTags.toList()
+                val topicTags = selectedTopicTags.toList()
+
                 val allTags = (
-                        selectedGameTags.toList() +
-                                selectedTopicTags.toList()
+                        gameTags + topicTags
                         ).distinct()
 
-                // Сохраняем публикацию и теги в Firestore
-                val post = hashMapOf(
+                // Общие поля публикации.
+                val postData = hashMapOf<String, Any>(
                     "title" to title,
                     "content" to content,
                     "game" to selectedGame,
                     "postType" to selectedType,
-                    "gameTags" to selectedGameTags.toList(),
-                    "topicTags" to selectedTopicTags.toList(),
+                    "gameTags" to gameTags,
+                    "topicTags" to topicTags,
                     "tags" to allTags,
-                    "imageUrl" to imageUrl,
-                    "authorId" to user.uid,
-                    "authorName" to username,
-                    "createdAt" to FieldValue.serverTimestamp()
+                    "imageUrl" to imageUrl
                 )
 
-                withContext(Dispatchers.IO) {
-                    Tasks.await(
-                        db.collection("posts").add(post)
+                if (postBeingEdited != null) {
+
+                    // Обновляем существующий документ.
+                    // Автора и дату создания не меняем.
+                    withContext(Dispatchers.IO) {
+
+                        Tasks.await(
+                            db.collection("posts")
+                                .document(postBeingEdited.id)
+                                .update(postData)
+                        )
+                    }
+
+                    val updatedPost = postBeingEdited.copy(
+                        title = title,
+                        content = content,
+                        game = selectedGame,
+                        postType = selectedType,
+                        gameTags = gameTags,
+                        topicTags = topicTags,
+                        imageUrl = imageUrl
                     )
+
+                    showMessage("Изменения сохранены")
+
+                    onPostSaved(updatedPost)
+
+                } else {
+
+                    // Создаём новую публикацию.
+                    postData["authorId"] = user.uid
+                    postData["authorName"] = username
+                    postData["createdAt"] = FieldValue.serverTimestamp()
+
+                    withContext(Dispatchers.IO) {
+
+                        Tasks.await(
+                            db.collection("posts").add(postData)
+                        )
+                    }
+
+                    showMessage("Публикация успешно создана")
+
+                    // Очищаем форму только после создания новой публикации.
+                    view.findViewById<EditText>(
+                        R.id.postTitle
+                    ).text.clear()
+
+                    view.findViewById<EditText>(
+                        R.id.postContent
+                    ).text.clear()
+
+                    selectedImageUri = null
+
+                    selectedGameTags.clear()
+                    selectedTopicTags.clear()
+
+                    val imageArea = view.findViewById<FrameLayout>(
+                        R.id.imageUploadArea
+                    )
+
+                    imageArea.findViewWithTag<View>(
+                        "post_image_preview"
+                    )?.let {
+                        imageArea.removeView(it)
+                    }
+
+                    imageArea.findViewById<View>(
+                        R.id.imageUploadPlaceholder
+                    )?.visibility = View.VISIBLE
+
+                    renderTags()
+                    updateTagsHint(view)
                 }
-
-                showMessage("Публикация успешно создана")
-
-                view.findViewById<EditText>(
-                    R.id.postTitle
-                ).text.clear()
-
-                view.findViewById<EditText>(
-                    R.id.postContent
-                ).text.clear()
-
-                selectedImageUri = null
-                selectedGameTags.clear()
-                selectedTopicTags.clear()
-
-                val imageArea = view.findViewById<FrameLayout>(
-                    R.id.imageUploadArea
-                )
-
-                imageArea.findViewWithTag<View>(
-                    "post_image_preview"
-                )?.let {
-                    imageArea.removeView(it)
-                }
-
-                imageArea.findViewById<View>(
-                    R.id.imageUploadPlaceholder
-                )?.visibility = View.VISIBLE
-
-                renderTags()
-                updateTagsHint(view)
 
             } catch (e: Exception) {
+
                 android.util.Log.e(
                     "CreatePostManager",
-                    "Ошибка создания публикации",
+                    "Ошибка сохранения публикации",
                     e
                 )
 
                 showMessage(
-                    "Не удалось опубликовать: ${
+                    "Не удалось сохранить публикацию: ${
                         e.message ?: "неизвестная ошибка"
                     }"
                 )
+
             } finally {
+
                 publishButton.isEnabled = true
-                publishButton.text = "Опубликовать"
+
+                publishButton.text = if (editingPost != null) {
+                    "Сохранить изменения"
+                } else {
+                    "Опубликовать"
+                }
             }
         }
     }
 
     private fun showMessage(message: String) {
+
         Toast.makeText(
             activity,
             message,

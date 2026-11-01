@@ -18,6 +18,7 @@
 
         <!-- Заголовок -->
         <TextView
+            android:id="@+id/postScreenTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Создать публикацию"
