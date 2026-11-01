@@ -485,6 +485,10 @@ class ProfileManager(
         val token = Tasks.await(
             user.getIdToken(false)
         ).token ?: error("Не удалось получить токен")
+        Log.d(
+            "GamerHubUpload",
+            "Firebase token получен: ${token.split(".").size == 3} частей JWT"
+        )
 
         val resolver = view.context.contentResolver
 
@@ -521,16 +525,27 @@ class ProfileManager(
             connection.connectTimeout = 15_000
             connection.readTimeout = 30_000
             connection.doOutput = true
+            connection.useCaches = false
 
+            connection.setRequestProperty(
+                "apikey",
+                "sb_publishable_gjoGJw1PsN3_hXth7DuIsg_ruUUnIZ5"
+            )
             connection.setRequestProperty(
                 "Authorization",
                 "Bearer $token"
+            )
+            Log.d(
+                "GamerHubUpload",
+                "Токен получен, количество частей: ${token.split(".").size}"
             )
 
             connection.setRequestProperty(
                 "Content-Type",
                 "multipart/form-data; boundary=$boundary"
             )
+            Log.d("GamerHubUpload", "Начинаем отправку файла")
+            val uploadStartTime = System.currentTimeMillis()
 
             connection.outputStream.use { output ->
                 writeText(output, "--$boundary\r\n")
@@ -549,6 +564,16 @@ class ProfileManager(
                 output.write(fileBytes)
                 writeText(output, "\r\n--$boundary--\r\n")
             }
+
+            Log.d(
+                "GamerHubUpload",
+                "Файл передан в поток за ${System.currentTimeMillis() - uploadStartTime} мс"
+            )
+
+            Log.d(
+                "GamerHubUpload",
+                "Ждём ответ Supabase; прошло ${System.currentTimeMillis() - uploadStartTime} мс"
+            )
 
             val responseCode = connection.responseCode
 
