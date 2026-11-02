@@ -35,7 +35,7 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
+import kotlinx.coroutines.tasks.await
 class MainActivity : AppCompatActivity() {
     private lateinit var notificationsManager: NotificationsManager
 
@@ -151,6 +151,63 @@ class MainActivity : AppCompatActivity() {
     // ON CREATE
     // ============================================================
 
+    private fun openPostFromNotification(postId: String) {
+        if (postId.isBlank()) {
+            Toast.makeText(
+                this,
+                "Не удалось определить публикацию",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                val document = com.google.firebase.firestore
+                    .FirebaseFirestore.getInstance()
+                    .collection("posts")
+                    .document(postId)
+                    .get()
+                    .await()
+
+                if (!document.exists()) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Эта публикация больше не существует",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+
+                val post = document.toObject(Post::class.java)
+                    ?.copy(id = document.id)
+
+                if (post == null) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Не удалось открыть публикацию",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@launch
+                }
+
+                openPostDetails(post)
+
+            } catch (e: Exception) {
+                android.util.Log.e(
+                    "MainActivity",
+                    "Не удалось открыть публикацию из уведомления",
+                    e
+                )
+
+                Toast.makeText(
+                    this@MainActivity,
+                    "Ошибка загрузки публикации",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -163,7 +220,16 @@ class MainActivity : AppCompatActivity() {
 
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
-        notificationsManager = NotificationsManager()
+        notificationsManager = NotificationsManager(
+            onNotificationClick = { postId ->
+                openPostFromNotification(postId)
+            },
+            onProfileClick = { userId ->
+                openPublicProfile(userId) {
+                    openPage(R.layout.screen_notifications)
+                }
+            }
+        )
 
         pageContainer = findViewById(R.id.pageContainer)
 
