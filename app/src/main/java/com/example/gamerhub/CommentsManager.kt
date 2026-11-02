@@ -4,20 +4,25 @@ package com.example.gamerhub
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-import com.google.firebase.Timestamp
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 class CommentsManager(
@@ -60,12 +65,12 @@ class CommentsManager(
             sendButton.isEnabled = false
         }
 
-        // Коллекция комментариев конкретной публикации
+        // Коллекция комментариев конкретной публикации.
         val comments = db.collection("posts")
             .document(postId)
             .collection("comments")
 
-        // Слушаем изменения в реальном времени
+        // Слушаем изменения комментариев в реальном времени.
         commentsListener = comments
             .orderBy("createdAt", Query.Direction.ASCENDING)
             .addSnapshotListener { snapshot, error ->
@@ -73,6 +78,13 @@ class CommentsManager(
                 if (error != null) {
                     emptyText.text = "Не удалось загрузить комментарии"
                     emptyText.visibility = View.VISIBLE
+
+                    android.util.Log.e(
+                        "CommentsManager",
+                        "Ошибка загрузки комментариев",
+                        error
+                    )
+
                     return@addSnapshotListener
                 }
 
@@ -89,19 +101,33 @@ class CommentsManager(
                 }
 
                 documents.forEach { document ->
+                    val authorId = document.getString("authorId").orEmpty()
+
                     val author = document.getString("authorName")
-                        ?.ifBlank { "Игрок GamerHub" }
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
                         ?: "Игрок GamerHub"
 
                     val text = document.getString("text").orEmpty()
                     val timestamp = document.getTimestamp("createdAt")
 
-                    container.addView(
-                        createCommentView(author, text, timestamp)
+                    val avatarUrl = document
+                        .getString("authorAvatarUrl")
+                        .orEmpty()
+
+                    val commentView = createCommentView(
+                        author = author,
+                        authorId = authorId,
+                        avatarUrl = avatarUrl,
+                        commentText = text,
+                        timestamp = timestamp
                     )
+
+                    container.addView(commentView)
                 }
             }
 
+        // Отправка комментария.
         sendButton.setOnClickListener {
             val currentUser = FirebaseAuth.getInstance().currentUser
 
@@ -111,6 +137,7 @@ class CommentsManager(
                     "Войди, чтобы оставить комментарий",
                     Toast.LENGTH_SHORT
                 ).show()
+
                 return@setOnClickListener
             }
 
@@ -128,24 +155,39 @@ class CommentsManager(
 
             sendButton.isEnabled = false
 
-            val authorName = currentUser.displayName
-                ?.takeIf { it.isNotBlank() }
-                ?: currentUser.email
-                    ?.substringBefore("@")
-                    ?.takeIf { it.isNotBlank() }
-                ?: "Игрок GamerHub"
+            activity.lifecycleScope.launch {
+                try {
+                    // Получаем актуальные данные пользователя.
+                    val profile = db.collection("publicProfiles")
+                        .document(currentUser.uid)
+                        .get()
+                        .await()
 
-            val comment = hashMapOf(
-                "text" to commentText,
-                "authorId" to currentUser.uid,
-                "authorName" to authorName,
-                "createdAt" to FieldValue.serverTimestamp()
-            )
+                    val authorName = profile.getString("username")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Игрок GamerHub"
 
-            comments.add(comment)
-                .addOnSuccessListener {
+                    val authorAvatarUrl = profile.getString("avatarUrl")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: profile.getString("avatarUri")
+                            ?.takeIf { it.isNotBlank() }
+                        ?: ""
+
+                    val comment = hashMapOf(
+                        "text" to commentText,
+                        "authorId" to currentUser.uid,
+                        "authorName" to authorName,
+                        "authorAvatarUrl" to authorAvatarUrl,
+                        "createdAt" to FieldValue.serverTimestamp()
+                    )
+
+                    // Сохраняем комментарий.
+                    comments.add(comment).await()
+
                     input.text.clear()
 
+                    // Уведомляем автора публикации.
                     createCommentNotification(
                         actorUid = currentUser.uid,
                         actorName = authorName,
@@ -157,42 +199,47 @@ class CommentsManager(
                         "Комментарий опубликован",
                         Toast.LENGTH_SHORT
                     ).show()
-                }
-                .addOnFailureListener { exception ->
+
+                } catch (e: Exception) {
                     android.util.Log.e(
                         "CommentsManager",
                         "Ошибка отправки комментария",
-                        exception
+                        e
                     )
 
                     Toast.makeText(
                         activity,
-                        "Ошибка: ${exception.message}",
-                        Toast.LENGTH_LONG
+                        "Не удалось отправить комментарий",
+                        Toast.LENGTH_SHORT
                     ).show()
+
+                } finally {
+                    sendButton.isEnabled =
+                        FirebaseAuth.getInstance().currentUser != null
                 }
-                .addOnCompleteListener {
-                    sendButton.isEnabled = true
-                }
+            }
         }
     }
+
     private fun createCommentNotification(
         actorUid: String,
         actorName: String,
         commentText: String
     ) {
-        // Получаем данные публикации
+        // Получаем данные публикации.
         db.collection("posts")
             .document(postId)
             .get()
             .addOnSuccessListener { postDocument ->
 
-                if (!postDocument.exists()) return@addOnSuccessListener
+                if (!postDocument.exists()) {
+                    return@addOnSuccessListener
+                }
 
                 val postAuthorId = postDocument.getString("authorId")
                     ?: return@addOnSuccessListener
 
-                // Не уведомляем пользователя о собственном комментарии
+                // Не уведомляем пользователя о собственном комментарии.
                 if (postAuthorId.isBlank() || postAuthorId == actorUid) {
                     return@addOnSuccessListener
                 }
@@ -234,6 +281,8 @@ class CommentsManager(
 
     private fun createCommentView(
         author: String,
+        authorId: String,
+        avatarUrl: String,
         commentText: String,
         timestamp: Timestamp?
     ): View {
@@ -255,20 +304,131 @@ class CommentsManager(
             }
         }
 
+        // Шапка комментария: аватар и ник.
+        val authorRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val avatar = ImageView(activity).apply {
+            val size = (36 * resources.displayMetrics.density).toInt()
+
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(45, 40, 60))
+            }
+
+            clipToOutline = true
+            setImageResource(R.drawable.ic_launcher_foreground)
+            contentDescription = "Аватар $author"
+        }
+
         val authorView = TextView(activity).apply {
             text = author
             textSize = 14f
             setTextColor(Color.WHITE)
             setTypeface(null, Typeface.BOLD)
+
+            setPadding(
+                (10 * resources.displayMetrics.density).toInt(),
+                0,
+                0,
+                0
+            )
         }
 
+        authorRow.addView(avatar)
+        authorRow.addView(authorView)
+
+        // Загружаем актуальные имя и аватар из публичного профиля.
+        if (authorId.isNotBlank()) {
+            activity.lifecycleScope.launch {
+                try {
+                    val profile = db.collection("publicProfiles")
+                        .document(authorId)
+                        .get()
+                        .await()
+
+                    val profileName = profile.getString("username")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+
+                    val profileAvatar = profile.getString("avatarUrl")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: profile.getString("avatarUri").orEmpty()
+
+                    // Обновляем ник, если он найден.
+                    if (!profileName.isNullOrBlank()) {
+                        authorView.text = profileName
+                    }
+
+                    // Сначала используем аватар из профиля.
+                    // Если его нет, используем URL из комментария.
+                    val finalAvatarUrl = profileAvatar
+                        .takeIf { it.startsWith("https://") }
+                        ?: avatarUrl.takeIf {
+                            it.startsWith("https://")
+                        }
+
+                    if (
+                        !finalAvatarUrl.isNullOrBlank() &&
+                        !activity.isFinishing &&
+                        !activity.isDestroyed
+                    ) {
+                        Glide.with(activity)
+                            .load(finalAvatarUrl)
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .error(R.drawable.ic_launcher_foreground)
+                            .circleCrop()
+                            .into(avatar)
+                    }
+
+                } catch (e: Exception) {
+                    android.util.Log.e(
+                        "CommentsManager",
+                        "Не удалось загрузить профиль комментатора",
+                        e
+                    )
+
+                    // Если профиль недоступен, используем сохранённый аватар.
+                    if (
+                        avatarUrl.startsWith("https://") &&
+                        !activity.isFinishing &&
+                        !activity.isDestroyed
+                    ) {
+                        Glide.with(activity)
+                            .load(avatarUrl)
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .error(R.drawable.ic_launcher_foreground)
+                            .circleCrop()
+                            .into(avatar)
+                    }
+                }
+            }
+        } else if (avatarUrl.startsWith("https://")) {
+            // Для комментариев без authorId используем сохранённый аватар.
+            if (!activity.isFinishing && !activity.isDestroyed) {
+                Glide.with(activity)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .circleCrop()
+                    .into(avatar)
+            }
+        }
+
+        // Текст комментария.
         val contentView = TextView(activity).apply {
             text = commentText
             textSize = 14f
             setTextColor(Color.rgb(220, 220, 225))
-            setPadding(0, 8, 0, 8)
+            setPadding(0, 10, 0, 8)
         }
 
+        // Дата публикации комментария.
         val dateView = TextView(activity).apply {
             text = timestamp?.toDate()?.let { date ->
                 SimpleDateFormat(
@@ -281,7 +441,7 @@ class CommentsManager(
             setTextColor(Color.rgb(160, 160, 170))
         }
 
-        card.addView(authorView)
+        card.addView(authorRow)
         card.addView(contentView)
         card.addView(dateView)
 

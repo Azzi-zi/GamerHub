@@ -15,6 +15,8 @@ import android.graphics.drawable.GradientDrawable
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.app.AlertDialog
+
 class PostDetailsManager(
     private val activity: AppCompatActivity,
     private val post: Post,
@@ -52,6 +54,68 @@ class PostDetailsManager(
             }
         } else {
             editButton.visibility = View.GONE
+        }
+
+        // Удаление публикации — только для её автора.
+        val deleteButton = view.findViewById<TextView>(
+            R.id.postDetailsDeleteButton
+        )
+
+        val currentUid = FirebaseAuth.getInstance()
+            .currentUser?.uid
+
+        if (post.authorId.isNotBlank() &&
+            post.authorId == currentUid
+        ) {
+            deleteButton.visibility = View.VISIBLE
+
+            deleteButton.setOnClickListener {
+                AlertDialog.Builder(activity)
+                    .setTitle("Удалить публикацию?")
+                    .setMessage(
+                        "Публикация будет удалена. Это действие нельзя отменить."
+                    )
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Удалить") { _, _ ->
+
+                        deleteButton.isEnabled = false
+
+                        activity.lifecycleScope.launch {
+                            try {
+                                db.collection("posts")
+                                    .document(post.id)
+                                    .delete()
+                                    .await()
+
+                                Toast.makeText(
+                                    activity,
+                                    "Публикация удалена",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                onBack()
+
+                            } catch (e: Exception) {
+                                android.util.Log.e(
+                                    "PostDetailsManager",
+                                    "Ошибка удаления публикации",
+                                    e
+                                )
+
+                                Toast.makeText(
+                                    activity,
+                                    "Не удалось удалить публикацию",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                deleteButton.isEnabled = true
+                            }
+                        }
+                    }
+                    .show()
+            }
+        } else {
+            deleteButton.visibility = View.GONE
         }
 
         // Обложка публикации
