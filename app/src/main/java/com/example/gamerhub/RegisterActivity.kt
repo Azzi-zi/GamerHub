@@ -12,26 +12,33 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
+
 class RegisterActivity : AppCompatActivity() {
 
-    // Объект для работы с Firebase Authentication
+    // Объект для работы с Firebase Authentication.
     private lateinit var auth: FirebaseAuth
 
-    // Объект для работы с базой данных Firestore
+    // Объект для работы с базой данных Cloud Firestore.
     private lateinit var db: FirebaseFirestore
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Подключаем XML-разметку экрана регистрации.
         setContentView(R.layout.activity_register)
 
 
+        // =====================================================
+        // ОФОРМЛЕНИЕ ЛОГОТИПА
+        // =====================================================
 
         val title = findViewById<TextView>(R.id.logoText)
 
-// Сохраняем приставку и пробел перед названием
         val text = SpannableString("🎮 GamerHub")
 
-// Первые символы — приставка, пробел и Gamer — белые
+        // Эмодзи, пробел и Gamer окрашиваем в белый цвет.
         text.setSpan(
             ForegroundColorSpan(Color.WHITE),
             0,
@@ -39,7 +46,7 @@ class RegisterActivity : AppCompatActivity() {
             SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE
         )
 
-// Hub — фиолетовый
+        // Hub окрашиваем в фиолетовый цвет.
         text.setSpan(
             ForegroundColorSpan(Color.rgb(160, 90, 255)),
             8,
@@ -49,78 +56,152 @@ class RegisterActivity : AppCompatActivity() {
 
         title.text = text
 
-        // Получаем доступ к Firebase Authentication
+
+        // =====================================================
+        // ПОДКЛЮЧЕНИЕ FIREBASE
+        // =====================================================
+
         auth = FirebaseAuth.getInstance()
 
         db = FirebaseFirestore.getInstance()
 
-        // Находим элементы интерфейса по их ID
+
+        // =====================================================
+        // ПОЛУЧЕНИЕ ЭЛЕМЕНТОВ ИНТЕРФЕЙСА
+        // =====================================================
+
         val usernameInput = findViewById<EditText>(R.id.usernameInput)
+
         val emailInput = findViewById<EditText>(R.id.emailInput)
+
         val passwordInput = findViewById<EditText>(R.id.passwordInput)
+
         val registerButton = findViewById<Button>(R.id.registerButton)
+
         val loginLink = findViewById<TextView>(R.id.loginLink)
 
-        // Обрабатываем нажатие на кнопку регистрации
+
+        // =====================================================
+        // РЕГИСТРАЦИЯ ПОЛЬЗОВАТЕЛЯ
+        // =====================================================
+
         registerButton.setOnClickListener {
 
+            // Получаем данные из полей ввода.
             val username = usernameInput.text.toString().trim()
+
             val email = emailInput.text.toString().trim()
+
             val password = passwordInput.text.toString()
 
+
+            // Проверяем, заполнены ли все поля.
             if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Заполни все поля", Toast.LENGTH_SHORT).show()
+
+                Toast.makeText(
+                    this,
+                    "Заполни все поля",
+                    Toast.LENGTH_SHORT
+                ).show()
+
                 return@setOnClickListener
             }
 
-            // Создаём аккаунт в Firebase
+
+            // Создаём аккаунт через Firebase Authentication.
             auth.createUserWithEmailAndPassword(email, password)
+
                 .addOnCompleteListener(this) { task ->
 
                     if (task.isSuccessful) {
 
-                        // Получаем созданный аккаунт
+                        // Получаем созданный аккаунт.
                         val user = auth.currentUser
-
 
                         if (user != null) {
 
-                            // Личные данные пользователя
+                            // ---------------------------------
+                            // ЛИЧНЫЙ ПРОФИЛЬ
+                            // ---------------------------------
+
                             val profile = hashMapOf(
                                 "uid" to user.uid,
                                 "email" to email,
                                 "username" to username,
-                                "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+                                "createdAt" to FieldValue.serverTimestamp()
                             )
+
+
+                            // ---------------------------------
+                            // ПУБЛИЧНЫЙ ПРОФИЛЬ
+                            // ---------------------------------
 
                             val publicProfile = hashMapOf(
                                 "uid" to user.uid,
                                 "username" to username
                             )
 
-                            // Готовим запись в две коллекции
+
+                            // ---------------------------------
+                            // СОХРАНЕНИЕ ДАННЫХ
+                            // ---------------------------------
+
+                            // Создаём пакет операций Firestore.
                             val batch = db.batch()
 
+                            // Сохраняем личный профиль.
                             batch.set(
                                 db.collection("users").document(user.uid),
                                 profile
                             )
 
+                            // Сохраняем публичный профиль.
                             batch.set(
                                 db.collection("publicProfiles").document(user.uid),
                                 publicProfile
                             )
 
-                            // Сохраняем обе записи
+
+                            // Выполняем сохранение.
                             batch.commit()
+
                                 .addOnSuccessListener {
+
                                     Toast.makeText(
                                         this,
-                                        "Аккаунт создан! Профиль сохранён.",
+                                        "Аккаунт создан! Добро пожаловать в GamerHub!",
                                         Toast.LENGTH_LONG
                                     ).show()
+
+
+                                    // ---------------------------------
+                                    // ПЕРЕХОД НА ГЛАВНЫЙ ЭКРАН
+                                    // ---------------------------------
+
+                                    // Создаём Intent для открытия MainActivity.
+                                    val intent = Intent(
+                                        this,
+                                        MainActivity::class.java
+                                    )
+
+                                    // Очищаем предыдущие экраны из стека.
+                                    // Пользователь не сможет вернуться
+                                    // кнопкой «Назад» на регистрацию.
+                                    intent.flags =
+                                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                                                Intent.FLAG_ACTIVITY_CLEAR_TASK
+
+                                    // Открываем главный экран GamerHub.
+                                    startActivity(intent)
+
+                                    // Закрываем экран регистрации.
+                                    finish()
                                 }
+
                                 .addOnFailureListener { error ->
+
+                                    // Если Firestore не сохранил профиль,
+                                    // показываем сообщение об ошибке.
                                     Toast.makeText(
                                         this,
                                         "Ошибка сохранения профиля: ${error.localizedMessage}",
@@ -129,9 +210,9 @@ class RegisterActivity : AppCompatActivity() {
                                 }
                         }
 
-
                     } else {
 
+                        // Если Firebase Authentication не смог создать аккаунт.
                         Toast.makeText(
                             this,
                             task.exception?.localizedMessage
@@ -142,7 +223,13 @@ class RegisterActivity : AppCompatActivity() {
                 }
         }
 
+
+        // =====================================================
+        // ПЕРЕХОД НА ЭКРАН АВТОРИЗАЦИИ
+        // =====================================================
+
         loginLink.setOnClickListener {
+
             startActivity(
                 Intent(this, LoginActivity::class.java)
             )
