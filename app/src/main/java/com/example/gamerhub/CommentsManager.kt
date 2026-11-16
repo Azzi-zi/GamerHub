@@ -1,504 +1,786 @@
-package com.example.gamerhub // Указывает пакет, к которому относится файл.
 
-import android.graphics.Color // Предоставляет готовые цвета и инструменты для работы с ними.
-import android.graphics.Typeface // Позволяет настраивать начертание шрифта.
-import android.graphics.drawable.GradientDrawable // Позволяет создавать фоны с цветом и закруглёнными углами.
-import android.view.Gravity // Управляет выравниванием элементов интерфейса.
-import android.view.View // Базовый класс всех элементов интерфейса Android.
-import android.widget.EditText // Поле для ввода текста.
-import android.widget.ImageView // Компонент для отображения изображений.
-import android.widget.LinearLayout // Контейнер для размещения элементов по горизонтали или вертикали.
-import android.widget.TextView // Компонент для отображения текста.
-import android.widget.Toast // Позволяет показывать короткие всплывающие сообщения.
-import androidx.appcompat.app.AppCompatActivity // Базовый класс Activity с поддержкой дополнительных возможностей.
-import androidx.lifecycle.lifecycleScope // Позволяет запускать корутины, связанные с жизненным циклом Activity.
-import com.bumptech.glide.Glide // Библиотека для загрузки изображений по ссылке.
-import com.google.firebase.Timestamp // Тип данных Firebase для хранения даты и времени.
-import com.google.firebase.auth.FirebaseAuth // Предоставляет доступ к данным авторизованного пользователя.
-import com.google.firebase.firestore.FieldValue // Позволяет использовать специальные значения Firestore, например время сервера.
-import com.google.firebase.firestore.FirebaseFirestore // Подключает облачную базу данных Firestore.
-import com.google.firebase.firestore.ListenerRegistration // Позволяет управлять слушателями изменений Firestore.
-import com.google.firebase.firestore.Query // Предоставляет параметры для настройки запросов к Firestore.
-import kotlinx.coroutines.launch // Позволяет запускать корутины.
-import kotlinx.coroutines.tasks.await // Позволяет ожидать завершения Firebase Task внутри корутины.
-import java.text.SimpleDateFormat // Позволяет преобразовывать дату и время в строку заданного формата.
-import java.util.Locale // Используется для учёта региональных настроек устройства.
+package com.example.gamerhub
 
-// Менеджер отвечает за загрузку, отображение и отправку комментариев к публикации.
+import android.app.AlertDialog
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.view.View
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
+import java.util.Locale
+
+// Менеджер отвечает за загрузку, отображение,
+// создание и редактирование комментариев.
 class CommentsManager(
-    private val activity: AppCompatActivity, // Activity, на которой отображаются комментарии.
-    private val postId: String // ID публикации, к которой относятся комментарии.
+    private val activity: AppCompatActivity,
+    private val postId: String
 ) {
 
-    private val db = FirebaseFirestore.getInstance() // Получает экземпляр облачной базы данных Firestore.
-    private var commentsListener: ListenerRegistration? = null // Хранит слушатель изменений комментариев; изначально отсутствует.
+    private val db = FirebaseFirestore.getInstance()
 
-    // Настраивает отображение комментариев и обработчик кнопки отправки.
+    // Слушатель изменений комментариев в Firestore.
+    private var commentsListener: ListenerRegistration? = null
+
+    // Настройка экрана комментариев.
     fun setup(view: View) {
 
-        // Находит контейнер, в который будут добавляться карточки комментариев.
+        // Контейнер карточек комментариев.
         val container = view.findViewById<LinearLayout>(
-            R.id.commentsContainer // ID контейнера из XML-разметки.
-        ) ?: return // Если контейнер не найден, прекращает выполнение функции.
+            R.id.commentsContainer
+        ) ?: return
 
-        // Находит текстовый элемент для сообщений о состоянии списка комментариев.
+        // Текст, который отображается, если комментариев нет.
         val emptyText = view.findViewById<TextView>(
-            R.id.commentsEmptyText // ID текста пустого состояния из XML.
-        ) ?: return // Если элемент отсутствует, прекращает настройку.
+            R.id.commentsEmptyText
+        ) ?: return
 
-        // Находит поле, в которое пользователь вводит комментарий.
+        // Поле ввода нового комментария.
         val input = view.findViewById<EditText>(
-            R.id.commentInput // ID поля ввода из XML.
-        ) ?: return // Если поле не найдено, прекращает выполнение.
+            R.id.commentInput
+        ) ?: return
 
-        // Находит кнопку отправки комментария.
+        // Кнопка отправки комментария.
         val sendButton = view.findViewById<TextView>(
-            R.id.sendCommentButton // ID кнопки отправки из XML.
-        ) ?: return // Если кнопка отсутствует, прекращает настройку.
+            R.id.sendCommentButton
+        ) ?: return
 
-        // Проверяет, передан ли корректный ID публикации.
+        // Проверяем ID публикации.
         if (postId.isBlank()) {
-            emptyText.text = "Не удалось определить публикацию" // Показывает сообщение об ошибке.
-            emptyText.visibility = View.VISIBLE // Делает сообщение видимым.
-            sendButton.isEnabled = false // Запрещает отправлять комментарии без ID публикации.
-            return // Завершает настройку.
+            emptyText.text = "Не удалось определить публикацию"
+            emptyText.visibility = View.VISIBLE
+            sendButton.isEnabled = false
+            return
         }
 
-        val user = FirebaseAuth.getInstance().currentUser // Получает данные текущего авторизованного пользователя.
+        // Проверяем авторизацию пользователя.
+        val user = FirebaseAuth.getInstance().currentUser
 
-        // Проверяет, выполнил ли пользователь вход в аккаунт.
         if (user == null) {
-            input.isEnabled = false // Отключает поле ввода комментария.
-            input.hint = "Войди, чтобы комментировать" // Показывает подсказку вместо возможности ввода.
-            sendButton.isEnabled = false // Отключает кнопку отправки.
+            input.isEnabled = false
+            input.hint = "Войди, чтобы комментировать"
+            sendButton.isEnabled = false
         }
 
-        // Получает ссылку на коллекцию комментариев конкретной публикации.
-        val comments = db.collection("posts") // Обращается к коллекции публикаций.
-            .document(postId) // Выбирает документ нужной публикации.
-            .collection("comments") // Переходит к вложенной коллекции комментариев.
+        // Получаем коллекцию комментариев конкретной публикации.
+        val comments = db.collection("posts")
+            .document(postId)
+            .collection("comments")
 
-        // Подписывается на изменения комментариев в реальном времени.
+        // Подписываемся на изменения комментариев.
         commentsListener = comments
-            .orderBy("createdAt", Query.Direction.ASCENDING) // Сортирует комментарии по времени от старых к новым.
-            .addSnapshotListener { snapshot, error -> // Получает обновления коллекции при изменении данных.
+            .orderBy("createdAt", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshot, error ->
 
-                // Проверяет, возникла ли ошибка при получении комментариев.
+                // Обрабатываем ошибку загрузки.
                 if (error != null) {
-                    emptyText.text = "Не удалось загрузить комментарии" // Показывает сообщение об ошибке.
-                    emptyText.visibility = View.VISIBLE // Делает сообщение видимым.
 
-                    // Записывает подробную информацию об ошибке в Logcat.
+                    emptyText.text = "Не удалось загрузить комментарии"
+                    emptyText.visibility = View.VISIBLE
+
                     android.util.Log.e(
-                        "CommentsManager", // Тег, по которому можно найти сообщение в Logcat.
-                        "Ошибка загрузки комментариев", // Описание произошедшей ошибки.
-                        error // Сам объект ошибки.
+                        "CommentsManager",
+                        "Ошибка загрузки комментариев",
+                        error
                     )
 
-                    return@addSnapshotListener // Завершает обработку текущего обновления.
+                    return@addSnapshotListener
                 }
 
-                if (snapshot == null) return@addSnapshotListener // Если данные отсутствуют, прекращает обработку.
+                if (snapshot == null) {
+                    return@addSnapshotListener
+                }
 
-                container.removeAllViews() // Удаляет старые карточки перед отображением актуального списка.
+                // Удаляем старые карточки.
+                container.removeAllViews()
 
-                val documents = snapshot.documents // Получает список документов с комментариями.
+                val documents = snapshot.documents
 
-                // Показывает сообщение, если комментариев нет, и скрывает его в противном случае.
+                // Если комментариев нет, показываем соответствующее сообщение.
                 emptyText.visibility = if (documents.isEmpty()) {
-                    View.VISIBLE // Показывает элемент пустого состояния.
+                    View.VISIBLE
                 } else {
-                    View.GONE // Полностью скрывает элемент, если комментарии существуют.
+                    View.GONE
                 }
 
-                // Перебирает все документы комментариев.
+                // Создаём карточки для каждого комментария.
                 documents.forEach { document ->
 
-                    val authorId = document.getString("authorId").orEmpty() // Получает ID автора комментария или пустую строку.
+                    val authorId = document
+                        .getString("authorId")
+                        .orEmpty()
 
-                    // Получает имя автора и проверяет, что оно не пустое.
-                    val author = document.getString("authorName")
-                        ?.trim() // Убирает пробелы в начале и конце имени.
-                        ?.takeIf { it.isNotBlank() } // Оставляет имя только в том случае, если оно содержит символы.
-                        ?: "Игрок GamerHub" // Использует стандартное имя, если имя отсутствует.
+                    val author = document
+                        .getString("authorName")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Игрок GamerHub"
 
-                    val text = document.getString("text").orEmpty() // Получает текст комментария или пустую строку.
-                    val timestamp = document.getTimestamp("createdAt") // Получает дату и время создания комментария.
+                    val text = document
+                        .getString("text")
+                        .orEmpty()
 
-                    // Получает ссылку на аватар, сохранённую непосредственно в комментарии.
+                    val timestamp = document
+                        .getTimestamp("createdAt")
+
+                    // Проверяем, редактировался ли комментарий.
+                    val isEdited = document
+                        .getBoolean("isEdited") == true
+
                     val avatarUrl = document
-                        .getString("authorAvatarUrl") // Читает поле со ссылкой на аватар.
-                        .orEmpty() // Если ссылки нет, заменяет null пустой строкой.
+                        .getString("authorAvatarUrl")
+                        .orEmpty()
 
-                    // Создаёт визуальную карточку комментария с полученными данными.
+                    // Создаём карточку комментария.
                     val commentView = createCommentView(
-                        author = author, // Передаёт имя автора.
-                        authorId = authorId, // Передаёт ID автора.
-                        avatarUrl = avatarUrl, // Передаёт ссылку на аватар.
-                        commentText = text, // Передаёт текст комментария.
-                        timestamp = timestamp // Передаёт дату создания комментария.
+                        commentId = document.id,
+                        author = author,
+                        authorId = authorId,
+                        avatarUrl = avatarUrl,
+                        commentText = text,
+                        timestamp = timestamp,
+                        isEdited = isEdited
                     )
 
-                    container.addView(commentView) // Добавляет готовую карточку в общий список комментариев.
+                    container.addView(commentView)
                 }
             }
 
-        // Настраивает действие при нажатии на кнопку отправки комментария.
+        // Обработчик отправки нового комментария.
         sendButton.setOnClickListener {
 
-            val currentUser = FirebaseAuth.getInstance().currentUser // Получает данные пользователя непосредственно перед отправкой.
+            val currentUser = FirebaseAuth
+                .getInstance()
+                .currentUser
 
-            // Проверяет авторизацию ещё раз, чтобы не отправить комментарий от неизвестного пользователя.
+            // Проверяем авторизацию.
             if (currentUser == null) {
+
                 Toast.makeText(
-                    activity, // Контекст экрана, на котором показывается уведомление.
-                    "Войди, чтобы оставить комментарий", // Текст уведомления.
-                    Toast.LENGTH_SHORT // Короткая продолжительность показа.
-                ).show() // Показывает уведомление.
+                    activity,
+                    "Войди, чтобы оставить комментарий",
+                    Toast.LENGTH_SHORT
+                ).show()
 
-                return@setOnClickListener // Прекращает обработчик нажатия.
+                return@setOnClickListener
             }
 
-            val commentText = input.text.toString().trim() // Получает введённый текст и удаляет пробелы по краям.
+            // Получаем введённый текст.
+            val commentText = input.text
+                .toString()
+                .trim()
 
-            // Проверяет, не пустой ли комментарий.
+            // Проверяем пустой текст.
             if (commentText.isBlank()) {
-                input.error = "Напиши комментарий" // Показывает ошибку возле поля ввода.
-                return@setOnClickListener // Не продолжает отправку.
+                input.error = "Напиши комментарий"
+                return@setOnClickListener
             }
 
-            // Ограничивает длину комментария одной тысячей символов.
+            // Проверяем ограничение длины.
             if (commentText.length > 1000) {
-                input.error = "Максимум 1000 символов" // Показывает сообщение о превышении лимита.
-                return@setOnClickListener // Прерывает отправку.
+                input.error = "Максимум 1000 символов"
+                return@setOnClickListener
             }
 
-            sendButton.isEnabled = false // Временно отключает кнопку, чтобы избежать повторных нажатий.
+            sendButton.isEnabled = false
 
-            // Запускает корутину, чтобы выполнять асинхронные операции Firebase.
+            // Выполняем запросы Firebase в корутине.
             activity.lifecycleScope.launch {
+
                 try {
-                    // Получаем актуальные данные пользователя из публичного профиля.
-                    val profile = db.collection("publicProfiles") // Обращается к коллекции публичных профилей.
-                        .document(currentUser.uid) // Выбирает профиль текущего пользователя.
-                        .get() // Запрашивает документ профиля.
-                        .await() // Ожидает завершения запроса, не блокируя основной поток.
 
-                    // Получает имя автора из профиля.
-                    val authorName = profile.getString("username")
-                        ?.trim() // Убирает пробелы по краям имени.
-                        ?.takeIf { it.isNotBlank() } // Проверяет, что имя не пустое.
-                        ?: "Игрок GamerHub" // Использует стандартное имя, если имя отсутствует.
+                    // Загружаем публичный профиль пользователя.
+                    val profile = db.collection("publicProfiles")
+                        .document(currentUser.uid)
+                        .get()
+                        .await()
 
-                    // Получает ссылку на аватар пользователя.
-                    val authorAvatarUrl = profile.getString("avatarUrl")
-                        ?.takeIf { it.isNotBlank() } // Использует avatarUrl, если поле заполнено.
-                        ?: profile.getString("avatarUri") // Если avatarUrl отсутствует, проверяет avatarUri.
-                            ?.takeIf { it.isNotBlank() } // Использует avatarUri, если оно заполнено.
-                        ?: "" // Если обе ссылки отсутствуют, сохраняет пустую строку.
+                    // Получаем имя пользователя.
+                    val authorName = profile
+                        .getString("username")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Игрок GamerHub"
 
-                    // Формирует данные комментария для сохранения в Firestore.
+                    // Получаем аватар пользователя.
+                    val authorAvatarUrl = profile
+                        .getString("avatarUrl")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: profile.getString("avatarUri")
+                            ?.takeIf { it.isNotBlank() }
+                        ?: ""
+
+                    // Подготавливаем данные комментария.
                     val comment = hashMapOf(
-                        "text" to commentText, // Сохраняет текст комментария.
-                        "authorId" to currentUser.uid, // Сохраняет ID пользователя, написавшего комментарий.
-                        "authorName" to authorName, // Сохраняет имя автора.
-                        "authorAvatarUrl" to authorAvatarUrl, // Сохраняет ссылку на аватар автора.
-                        "createdAt" to FieldValue.serverTimestamp() // Записывает время создания по часам сервера Firebase.
+                        "text" to commentText,
+                        "authorId" to currentUser.uid,
+                        "authorName" to authorName,
+                        "authorAvatarUrl" to authorAvatarUrl,
+                        "createdAt" to FieldValue.serverTimestamp()
                     )
 
-                    // Сохраняет новый комментарий во вложенную коллекцию публикации.
-                    comments.add(comment).await() // Добавляет документ и ожидает завершения записи.
+                    // Сохраняем комментарий в Firestore.
+                    comments.add(comment).await()
 
-                    input.text.clear() // Очищает поле ввода после успешного сохранения комментария.
+                    // Очищаем поле ввода.
+                    input.text.clear()
 
-                    // Создаёт уведомление для автора публикации.
+                    // Создаём уведомление автору публикации.
                     createCommentNotification(
-                        actorUid = currentUser.uid, // Передаёт ID пользователя, оставившего комментарий.
-                        actorName = authorName, // Передаёт имя комментатора.
-                        commentText = commentText // Передаёт текст комментария для уведомления.
+                        actorUid = currentUser.uid,
+                        actorName = authorName,
+                        commentText = commentText
                     )
 
-                    // Показывает сообщение об успешной публикации комментария.
                     Toast.makeText(
-                        activity, // Контекст текущего экрана.
-                        "Комментарий опубликован", // Текст уведомления.
-                        Toast.LENGTH_SHORT // Короткая длительность показа.
-                    ).show() // Показывает уведомление.
+                        activity,
+                        "Комментарий опубликован",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
                 } catch (e: Exception) {
-                    // Записывает подробную информацию об ошибке отправки в Logcat.
+
                     android.util.Log.e(
-                        "CommentsManager", // Тег для поиска сообщения в Logcat.
-                        "Ошибка отправки комментария", // Описание ошибки.
-                        e // Объект исключения с подробностями.
+                        "CommentsManager",
+                        "Ошибка отправки комментария",
+                        e
                     )
 
-                    // Сообщает пользователю, что отправить комментарий не удалось.
                     Toast.makeText(
-                        activity, // Контекст текущего экрана.
-                        "Не удалось отправить комментарий", // Текст уведомления.
-                        Toast.LENGTH_SHORT // Короткая длительность показа.
-                    ).show() // Показывает уведомление.
+                        activity,
+                        "Не удалось отправить комментарий",
+                        Toast.LENGTH_SHORT
+                    ).show()
 
                 } finally {
-                    // Включает кнопку обратно после завершения отправки или возникновения ошибки.
+
+                    // Возвращаем доступность кнопки.
                     sendButton.isEnabled =
-                        FirebaseAuth.getInstance().currentUser != null // Кнопка доступна только авторизованному пользователю.
+                        FirebaseAuth.getInstance().currentUser != null
                 }
             }
         }
     }
 
-    // Создаёт уведомление для автора публикации о новом комментарии.
+    // Создаёт уведомление автору публикации о новом комментарии.
     private fun createCommentNotification(
-        actorUid: String, // ID пользователя, который оставил комментарий.
-        actorName: String, // Имя пользователя, который оставил комментарий.
-        commentText: String // Текст оставленного комментария.
+        actorUid: String,
+        actorName: String,
+        commentText: String
     ) {
 
-        // Получает данные публикации, чтобы определить её автора.
-        db.collection("posts") // Обращается к коллекции публикаций.
-            .document(postId) // Выбирает публикацию, к которой оставили комментарий.
-            .get() // Загружает документ публикации.
-            .addOnSuccessListener { postDocument -> // Выполняется после успешной загрузки документа.
+        // Загружаем публикацию.
+        db.collection("posts")
+            .document(postId)
+            .get()
+            .addOnSuccessListener { postDocument ->
 
-                // Проверяет, существует ли публикация.
                 if (!postDocument.exists()) {
-                    return@addOnSuccessListener // Если публикации нет, уведомление создавать не нужно.
+                    return@addOnSuccessListener
                 }
 
-                // Получает ID автора публикации.
-                val postAuthorId = postDocument.getString("authorId")
-                    ?: return@addOnSuccessListener // Если ID отсутствует, завершает создание уведомления.
+                // Определяем автора публикации.
+                val postAuthorId = postDocument
+                    .getString("authorId")
+                    ?: return@addOnSuccessListener
 
-                // Не уведомляем пользователя о собственном комментарии.
-                if (postAuthorId.isBlank() || postAuthorId == actorUid) {
-                    return@addOnSuccessListener // Прекращает выполнение, если автор публикации оставил комментарий сам.
+                // Не отправляем уведомление самому себе.
+                if (
+                    postAuthorId.isBlank() ||
+                    postAuthorId == actorUid
+                ) {
+                    return@addOnSuccessListener
                 }
 
-                val postTitle = postDocument.getString("title").orEmpty() // Получает название публикации или пустую строку.
+                val postTitle = postDocument
+                    .getString("title")
+                    .orEmpty()
 
-                // Формирует данные уведомления.
+                // Формируем уведомление.
                 val notification = hashMapOf(
-                    "type" to "comment", // Указывает тип уведомления — комментарий.
-                    "actorId" to actorUid, // Сохраняет ID пользователя, оставившего комментарий.
-                    "actorName" to actorName, // Сохраняет имя комментатора.
-                    "recipientId" to postAuthorId, // Указывает ID пользователя, которому предназначено уведомление.
-                    "postId" to postId, // Сохраняет ID публикации, к которой оставили комментарий.
-                    "postTitle" to postTitle, // Сохраняет название публикации.
-                    "commentText" to commentText, // Сохраняет текст комментария.
-                    "createdAt" to FieldValue.serverTimestamp(), // Сохраняет время создания уведомления по часам сервера.
-                    "read" to false // Отмечает уведомление как непрочитанное.
+                    "type" to "comment",
+                    "actorId" to actorUid,
+                    "actorName" to actorName,
+                    "recipientId" to postAuthorId,
+                    "postId" to postId,
+                    "postTitle" to postTitle,
+                    "commentText" to commentText,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "read" to false
                 )
 
-                // Переходит к коллекции уведомлений автора публикации.
-                db.collection("users") // Обращается к коллекции пользовательских данных.
-                    .document(postAuthorId) // Выбирает документ автора публикации.
-                    .collection("notifications") // Переходит к вложенной коллекции уведомлений.
-                    .add(notification) // Добавляет новое уведомление.
-                    .addOnFailureListener { error -> // Обрабатывает ошибку, если уведомление не удалось сохранить.
+                // Сохраняем уведомление.
+                db.collection("users")
+                    .document(postAuthorId)
+                    .collection("notifications")
+                    .add(notification)
+                    .addOnFailureListener { error ->
+
                         android.util.Log.e(
-                            "CommentsManager", // Тег для поиска ошибки в Logcat.
-                            "Не удалось создать уведомление", // Описание ошибки.
-                            error // Объект ошибки.
+                            "CommentsManager",
+                            "Не удалось создать уведомление",
+                            error
                         )
                     }
             }
-            .addOnFailureListener { error -> // Обрабатывает ошибку загрузки самой публикации.
+            .addOnFailureListener { error ->
+
                 android.util.Log.e(
-                    "CommentsManager", // Тег для поиска ошибки в Logcat.
-                    "Не удалось загрузить публикацию", // Описание ошибки.
-                    error // Объект ошибки.
+                    "CommentsManager",
+                    "Не удалось загрузить публикацию",
+                    error
                 )
             }
     }
 
-    // Создаёт и оформляет одну карточку комментария.
+    // Создаёт одну карточку комментария.
     private fun createCommentView(
-        author: String, // Имя автора комментария.
-        authorId: String, // ID автора комментария.
-        avatarUrl: String, // Ссылка на сохранённый аватар автора.
-        commentText: String, // Текст комментария.
-        timestamp: Timestamp? // Дата и время создания комментария; может отсутствовать.
-    ): View { // Функция возвращает готовый элемент интерфейса.
+        commentId: String,
+        author: String,
+        authorId: String,
+        avatarUrl: String,
+        commentText: String,
+        timestamp: Timestamp?,
+        isEdited: Boolean
+    ): View {
 
-        // Создаёт основную карточку комментария.
+        // Основная карточка.
         val card = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL // Располагает содержимое карточки вертикально.
-            setPadding(14, 12, 14, 12) // Задаёт внутренние отступы: слева, сверху, справа и снизу.
 
-            // Создаёт фон карточки.
+            orientation = LinearLayout.VERTICAL
+
+            setPadding(14, 12, 14, 12)
+
             background = GradientDrawable().apply {
-                setColor(Color.rgb(26, 26, 32)) // Устанавливает тёмный цвет фона.
-                cornerRadius = 14f // Закругляет углы карточки.
+                setColor(Color.rgb(26, 26, 32))
+                cornerRadius = 14f
             }
 
-            // Настраивает размеры и отступы карточки внутри родительского контейнера.
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, // Карточка занимает всю доступную ширину.
-                LinearLayout.LayoutParams.WRAP_CONTENT // Высота зависит от содержимого.
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = 10 // Добавляет отступ снизу между карточками.
+                bottomMargin = 10
             }
         }
 
-        // Шапка комментария: аватар и ник.
+        // Строка с аватаром и именем автора.
         val authorRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL // Размещает аватар и имя по горизонтали.
-            gravity = Gravity.CENTER_VERTICAL // Выравнивает элементы по вертикальному центру.
+
+            orientation = LinearLayout.HORIZONTAL
+
+            gravity = Gravity.CENTER_VERTICAL
         }
 
-        // Создаёт изображение аватара автора комментария.
+        // Аватар пользователя.
         val avatar = ImageView(activity).apply {
-            val size = (36 * resources.displayMetrics.density).toInt() // Переводит размер аватара из dp в пиксели с учётом плотности экрана.
 
-            layoutParams = LinearLayout.LayoutParams(size, size) // Устанавливает ширину и высоту аватара.
-            scaleType = ImageView.ScaleType.CENTER_CROP // Масштабирует изображение, заполняя область и обрезая лишние края.
+            val size = (
+                    36 * resources.displayMetrics.density
+                    ).toInt()
 
-            // Создаёт круглый фон для аватара.
+            layoutParams = LinearLayout.LayoutParams(
+                size,
+                size
+            )
+
+            scaleType = ImageView.ScaleType.CENTER_CROP
+
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL // Устанавливает овальную форму, которая при одинаковых размерах становится кругом.
-                setColor(Color.rgb(45, 40, 60)) // Задаёт цвет фона на случай отсутствия изображения.
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(45, 40, 60))
             }
 
-            clipToOutline = true // Обрезает содержимое изображения по форме фона.
-            setImageResource(R.drawable.ic_launcher_foreground) // Устанавливает стандартную картинку до загрузки аватара.
-            contentDescription = "Аватар $author" // Добавляет описание изображения для специальных средств доступности.
+            clipToOutline = true
+
+            setImageResource(
+                R.drawable.ic_launcher_foreground
+            )
+
+            contentDescription = "Аватар $author"
         }
 
-        // Создаёт текстовый элемент с именем автора.
+        // Имя автора комментария.
         val authorView = TextView(activity).apply {
-            text = author // Устанавливает переданное имя автора.
-            textSize = 14f // Задаёт размер текста.
-            setTextColor(Color.WHITE) // Устанавливает белый цвет текста.
-            setTypeface(null, Typeface.BOLD) // Делает имя автора жирным.
 
-            // Добавляет отступ слева от аватара.
+            text = author
+
+            textSize = 14f
+
+            setTextColor(Color.WHITE)
+
+            setTypeface(null, Typeface.BOLD)
+
             setPadding(
-                (10 * resources.displayMetrics.density).toInt(), // Отступ слева, переведённый из dp в пиксели.
-                0, // Отступ сверху.
-                0, // Отступ справа.
-                0 // Отступ снизу.
+                (10 * resources.displayMetrics.density).toInt(),
+                0,
+                0,
+                0
             )
         }
 
-        authorRow.addView(avatar) // Добавляет аватар в строку автора.
-        authorRow.addView(authorView) // Добавляет имя рядом с аватаром.
+        authorRow.addView(avatar)
+        authorRow.addView(authorView)
 
-        // Загружаем актуальные имя и аватар из публичного профиля.
-        if (authorId.isNotBlank()) { // Проверяет, что ID автора существует.
-            activity.lifecycleScope.launch { // Запускает корутину, связанную с жизненным циклом Activity.
+        // Загружаем актуальное имя и аватар автора из профиля.
+        if (authorId.isNotBlank()) {
+
+            activity.lifecycleScope.launch {
+
                 try {
-                    // Загружает актуальный публичный профиль автора комментария.
-                    val profile = db.collection("publicProfiles") // Обращается к коллекции публичных профилей.
-                        .document(authorId) // Выбирает профиль автора комментария.
-                        .get() // Запрашивает документ профиля.
-                        .await() // Ожидает завершения запроса, не блокируя основной поток.
 
-                    // Получает актуальное имя пользователя из профиля.
-                    val profileName = profile.getString("username")
-                        ?.trim() // Убирает пробелы по краям имени.
-                        ?.takeIf { it.isNotBlank() } // Оставляет имя, только если оно не пустое.
+                    val profile = db.collection("publicProfiles")
+                        .document(authorId)
+                        .get()
+                        .await()
 
-                    // Получает ссылку на актуальный аватар.
-                    val profileAvatar = profile.getString("avatarUrl")
-                        ?.takeIf { it.isNotBlank() } // Использует avatarUrl, если он заполнен.
-                        ?: profile.getString("avatarUri").orEmpty() // Если avatarUrl отсутствует, проверяет avatarUri.
+                    val profileName = profile
+                        .getString("username")
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
 
-                    // Обновляем ник, если он найден.
+                    val profileAvatar = profile
+                        .getString("avatarUrl")
+                        ?.takeIf { it.isNotBlank() }
+                        ?: profile.getString("avatarUri").orEmpty()
+
+                    // Обновляем имя.
                     if (!profileName.isNullOrBlank()) {
-                        authorView.text = profileName // Заменяет сохранённое имя актуальным именем из профиля.
+                        authorView.text = profileName
                     }
 
-                    // Сначала используем аватар из профиля.
-                    // Если его нет, используем URL из комментария.
+                    // Выбираем ссылку на аватар.
                     val finalAvatarUrl = profileAvatar
-                        .takeIf { it.startsWith("https://") } // Выбирает ссылку из профиля, если она начинается с https://.
-                        ?: avatarUrl.takeIf { // Если ссылки профиля нет, проверяет ссылку, сохранённую в комментарии.
-                            it.startsWith("https://") // Оставляет её только при наличии безопасного HTTPS-адреса.
+                        .takeIf { it.startsWith("https://") }
+                        ?: avatarUrl.takeIf {
+                            it.startsWith("https://")
                         }
 
-                    // Проверяет наличие ссылки и состояние Activity перед загрузкой изображения.
+                    // Загружаем аватар.
                     if (
-                        !finalAvatarUrl.isNullOrBlank() && // Проверяет, что ссылка существует и не пустая.
-                        !activity.isFinishing && // Проверяет, что Activity не завершает работу.
-                        !activity.isDestroyed // Проверяет, что Activity ещё не уничтожена.
+                        !finalAvatarUrl.isNullOrBlank() &&
+                        !activity.isFinishing &&
+                        !activity.isDestroyed
                     ) {
-                        Glide.with(activity) // Создаёт запрос Glide с контекстом Activity.
-                            .load(finalAvatarUrl) // Указывает адрес изображения.
-                            .placeholder(R.drawable.ic_launcher_foreground) // Показывает стандартное изображение во время загрузки.
-                            .error(R.drawable.ic_launcher_foreground) // Показывает стандартное изображение, если загрузка не удалась.
-                            .circleCrop() // Обрезает загруженное изображение по кругу.
-                            .into(avatar) // Помещает загруженное изображение в ImageView.
+
+                        Glide.with(activity)
+                            .load(finalAvatarUrl)
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .error(R.drawable.ic_launcher_foreground)
+                            .circleCrop()
+                            .into(avatar)
                     }
 
                 } catch (e: Exception) {
-                    // Записывает ошибку загрузки профиля в Logcat.
+
                     android.util.Log.e(
-                        "CommentsManager", // Тег для поиска сообщения.
-                        "Не удалось загрузить профиль комментатора", // Описание ошибки.
-                        e // Объект исключения.
+                        "CommentsManager",
+                        "Не удалось загрузить профиль комментатора",
+                        e
                     )
 
-                    // Если профиль недоступен, используем сохранённый аватар.
+                    // Если профиль не загрузился, используем
+                    // аватар, сохранённый непосредственно в комментарии.
                     if (
-                        avatarUrl.startsWith("https://") && // Проверяет, что сохранённая ссылка начинается с HTTPS.
-                        !activity.isFinishing && // Проверяет, что Activity не завершает работу.
-                        !activity.isDestroyed // Проверяет, что Activity ещё не уничтожена.
+                        avatarUrl.startsWith("https://") &&
+                        !activity.isFinishing &&
+                        !activity.isDestroyed
                     ) {
-                        Glide.with(activity) // Создаёт запрос загрузки изображения.
-                            .load(avatarUrl) // Использует ссылку из документа комментария.
-                            .placeholder(R.drawable.ic_launcher_foreground) // Показывает стандартный аватар во время загрузки.
-                            .error(R.drawable.ic_launcher_foreground) // Показывает стандартный аватар при ошибке.
-                            .circleCrop() // Обрезает изображение по кругу.
-                            .into(avatar) // Загружает изображение в ImageView.
+
+                        Glide.with(activity)
+                            .load(avatarUrl)
+                            .placeholder(R.drawable.ic_launcher_foreground)
+                            .error(R.drawable.ic_launcher_foreground)
+                            .circleCrop()
+                            .into(avatar)
                     }
                 }
             }
-        } else if (avatarUrl.startsWith("https://")) { // Если ID автора отсутствует, проверяет сохранённую ссылку на аватар.
 
-            // Для комментариев без authorId используем сохранённый аватар.
-            if (!activity.isFinishing && !activity.isDestroyed) { // Проверяет, что Activity ещё доступна.
-                Glide.with(activity) // Создаёт запрос Glide.
-                    .load(avatarUrl) // Передаёт ссылку на сохранённый аватар.
-                    .placeholder(R.drawable.ic_launcher_foreground) // Показывает стандартную картинку во время загрузки.
-                    .error(R.drawable.ic_launcher_foreground) // Показывает стандартную картинку при ошибке.
-                    .circleCrop() // Обрезает изображение по кругу.
-                    .into(avatar) // Загружает изображение в аватар.
+        } else if (avatarUrl.startsWith("https://")) {
+
+            // Загружаем сохранённый аватар,
+            // если ID автора отсутствует.
+            if (!activity.isFinishing && !activity.isDestroyed) {
+
+                Glide.with(activity)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_launcher_foreground)
+                    .error(R.drawable.ic_launcher_foreground)
+                    .circleCrop()
+                    .into(avatar)
             }
         }
 
-        // Создаёт текстовый элемент для содержимого комментария.
+        // Текст комментария.
         val contentView = TextView(activity).apply {
-            text = commentText // Устанавливает текст комментария.
-            textSize = 14f // Задаёт размер текста.
-            setTextColor(Color.rgb(220, 220, 225)) // Устанавливает светло-серый цвет текста.
-            setPadding(0, 10, 0, 8) // Добавляет отступы вокруг текста.
+
+            text = commentText
+
+            textSize = 14f
+
+            setTextColor(Color.rgb(220, 220, 225))
+
+            setPadding(0, 10, 0, 8)
         }
 
-        // Создаёт текстовый элемент для даты публикации комментария.
+        // Дата создания комментария.
         val dateView = TextView(activity).apply {
-            text = timestamp?.toDate()?.let { date -> // Проверяет наличие временной метки и преобразует её в Date.
-                SimpleDateFormat( // Создаёт форматировщик даты и времени.
-                    "dd.MM.yyyy HH:mm", // Задаёт формат: день, месяц, год, часы и минуты.
-                    Locale.getDefault() // Использует региональные настройки устройства.
-                ).format(date) // Преобразует дату в строку.
-            } ?: "Только что" // Если временная метка отсутствует, показывает текст «Только что».
 
-            textSize = 11f // Устанавливает небольшой размер текста.
-            setTextColor(Color.rgb(160, 160, 170)) // Задаёт серый цвет даты.
+            text = timestamp?.toDate()?.let { date ->
+
+                SimpleDateFormat(
+                    "dd.MM.yyyy HH:mm",
+                    Locale.getDefault()
+                ).format(date)
+
+            } ?: "Только что"
+
+            // Добавляем отметку, если комментарий редактировался.
+            if (isEdited) {
+                text = "$text · изменён"
+            }
+
+            textSize = 11f
+
+            setTextColor(Color.rgb(160, 160, 170))
         }
 
-        card.addView(authorRow) // Добавляет шапку с аватаром и именем в карточку.
-        card.addView(contentView) // Добавляет текст комментария.
-        card.addView(dateView) // Добавляет дату под текстом комментария.
+        card.addView(authorRow)
 
-        return card // Возвращает готовую карточку для добавления в контейнер.
+        card.addView(contentView)
+
+        card.addView(dateView)
+
+        // Проверяем, принадлежит ли комментарий текущему пользователю.
+        val currentUid = FirebaseAuth
+            .getInstance()
+            .currentUser
+            ?.uid
+
+        // Кнопка редактирования показывается только автору.
+        if (authorId.isNotBlank() && currentUid == authorId) {
+
+            val editButton = TextView(activity).apply {
+
+                text = "✎ Изменить"
+
+                textSize = 12f
+
+                setTextColor(Color.rgb(180, 110, 255))
+
+                gravity = Gravity.END
+
+                setPadding(0, 12, 0, 0)
+
+                isClickable = true
+
+                isFocusable = true
+
+                contentDescription = "Редактировать комментарий"
+
+                setOnClickListener {
+
+                    showEditCommentDialog(
+                        commentId = commentId,
+                        currentText = commentText
+                    )
+                }
+            }
+
+            card.addView(editButton)
+        }
+
+        return card
     }
 
-    // Отключает слушатель комментариев, когда экран больше не нуждается в обновлениях.
+    // Открывает диалог редактирования комментария.
+    private fun showEditCommentDialog(
+        commentId: String,
+        currentText: String
+    ) {
+
+        // Получаем текущего пользователя.
+        val currentUser = FirebaseAuth
+            .getInstance()
+            .currentUser
+
+        if (currentUser == null) {
+
+            Toast.makeText(
+                activity,
+                "Войди в аккаунт",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        // Поле с текущим текстом комментария.
+        val editInput = EditText(activity).apply {
+
+            setText(currentText)
+
+            // Перемещаем курсор в конец текста.
+            setSelection(text.length)
+
+            minLines = 3
+
+            maxLines = 8
+
+            setPadding(24, 16, 24, 16)
+
+            hint = "Текст комментария"
+        }
+
+        // Создаём окно редактирования.
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("Редактировать комментарий")
+            .setView(editInput)
+            .setNegativeButton("Отмена", null)
+            .setPositiveButton("Сохранить", null)
+            .create()
+
+        // Настраиваем кнопку сохранения после создания окна.
+        dialog.setOnShowListener {
+
+            val saveButton = dialog.getButton(
+                AlertDialog.BUTTON_POSITIVE
+            )
+
+            saveButton.setOnClickListener {
+
+                val updatedText = editInput.text
+                    .toString()
+                    .trim()
+
+                // Проверяем пустой текст.
+                if (updatedText.isBlank()) {
+
+                    editInput.error =
+                        "Комментарий не может быть пустым"
+
+                    return@setOnClickListener
+                }
+
+                // Проверяем максимальную длину.
+                if (updatedText.length > 1000) {
+
+                    editInput.error = "Максимум 1000 символов"
+
+                    return@setOnClickListener
+                }
+
+                // Временно блокируем кнопку.
+                saveButton.isEnabled = false
+
+                activity.lifecycleScope.launch {
+
+                    try {
+
+                        // Получаем ссылку на конкретный комментарий.
+                        val commentRef = db.collection("posts")
+                            .document(postId)
+                            .collection("comments")
+                            .document(commentId)
+
+                        // Повторно загружаем документ из Firestore.
+                        val commentDocument = commentRef
+                            .get()
+                            .await()
+
+                        // Проверяем настоящего автора комментария.
+                        val actualAuthorId = commentDocument
+                            .getString("authorId")
+
+                        // Не разрешаем редактировать чужие комментарии.
+                        if (
+                            !commentDocument.exists() ||
+                            actualAuthorId != currentUser.uid
+                        ) {
+
+                            Toast.makeText(
+                                activity,
+                                "Можно редактировать только свой комментарий",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            dialog.dismiss()
+
+                            return@launch
+                        }
+
+                        // Сохраняем изменения в Firestore.
+                        commentRef.update(
+                            mapOf(
+                                "text" to updatedText,
+                                "isEdited" to true,
+                                "editedAt" to FieldValue.serverTimestamp()
+                            )
+                        ).await()
+
+                        Toast.makeText(
+                            activity,
+                            "Комментарий обновлён",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        // Закрываем окно.
+                        // Список комментариев обновится автоматически
+                        // благодаря addSnapshotListener.
+                        dialog.dismiss()
+
+                    } catch (e: Exception) {
+
+                        android.util.Log.e(
+                            "CommentsManager",
+                            "Ошибка редактирования комментария",
+                            e
+                        )
+
+                        Toast.makeText(
+                            activity,
+                            "Не удалось изменить комментарий. Проверь права доступа.",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                    } finally {
+
+                        // Возвращаем кнопку в активное состояние,
+                        // если диалог ещё открыт.
+                        if (dialog.isShowing) {
+                            saveButton.isEnabled = true
+                        }
+                    }
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    // Отключаем слушатель Firestore,
+    // когда экран комментариев больше не используется.
     fun cleanup() {
-        commentsListener?.remove() // Удаляет слушатель Firestore, если он был создан.
-        commentsListener = null // Очищает ссылку на слушатель, чтобы не хранить ненужный объект.
+
+        commentsListener?.remove()
+
+        commentsListener = null
     }
 }
