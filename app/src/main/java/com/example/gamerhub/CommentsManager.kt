@@ -1,5 +1,6 @@
 package com.example.gamerhub // Указывает пакет, к которому относится файл.
 
+import android.app.AlertDialog // Позволяет показывать диалоговые окна.
 import android.graphics.Color // Предоставляет готовые цвета и инструменты для работы с ними.
 import android.graphics.Typeface // Позволяет настраивать начертание шрифта.
 import android.graphics.drawable.GradientDrawable // Позволяет создавать фоны с цветом и закруглёнными углами.
@@ -124,6 +125,7 @@ class CommentsManager(
 
                     val text = document.getString("text").orEmpty() // Получает текст комментария или пустую строку.
                     val timestamp = document.getTimestamp("createdAt") // Получает дату и время создания комментария.
+                    val isEdited = document.getBoolean("isEdited") == true // Проверяет, редактировался ли комментарий.
 
                     // Получает ссылку на аватар, сохранённую непосредственно в комментарии.
                     val avatarUrl = document
@@ -132,11 +134,13 @@ class CommentsManager(
 
                     // Создаёт визуальную карточку комментария с полученными данными.
                     val commentView = createCommentView(
+                        commentId = document.id, // Передаёт ID документа комментария для обновления.
                         author = author, // Передаёт имя автора.
                         authorId = authorId, // Передаёт ID автора.
                         avatarUrl = avatarUrl, // Передаёт ссылку на аватар.
                         commentText = text, // Передаёт текст комментария.
-                        timestamp = timestamp // Передаёт дату создания комментария.
+                        timestamp = timestamp, // Передаёт дату создания комментария.
+                        isEdited = isEdited // Передаёт признак редактирования.
                     )
 
                     container.addView(commentView) // Добавляет готовую карточку в общий список комментариев.
@@ -315,11 +319,13 @@ class CommentsManager(
 
     // Создаёт и оформляет одну карточку комментария.
     private fun createCommentView(
+        commentId: String, // ID документа комментария в Firestore.
         author: String, // Имя автора комментария.
         authorId: String, // ID автора комментария.
         avatarUrl: String, // Ссылка на сохранённый аватар автора.
         commentText: String, // Текст комментария.
-        timestamp: Timestamp? // Дата и время создания комментария; может отсутствовать.
+        timestamp: Timestamp?, // Дата и время создания комментария; может отсутствовать.
+        isEdited: Boolean // Показывает, редактировался ли комментарий.
     ): View { // Функция возвращает готовый элемент интерфейса.
 
         // Создаёт основную карточку комментария.
@@ -485,6 +491,10 @@ class CommentsManager(
                 ).format(date) // Преобразует дату в строку.
             } ?: "Только что" // Если временная метка отсутствует, показывает текст «Только что».
 
+            if (isEdited) {
+                text = "$text · изменён" // Помечает отредактированный комментарий.
+            }
+
             textSize = 11f // Устанавливает небольшой размер текста.
             setTextColor(Color.rgb(160, 160, 170)) // Задаёт серый цвет даты.
         }
@@ -493,7 +503,137 @@ class CommentsManager(
         card.addView(contentView) // Добавляет текст комментария.
         card.addView(dateView) // Добавляет дату под текстом комментария.
 
+        // Показываем управление только автору текущего комментария.
+        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+        if (!authorId.isBlank() && currentUid == authorId) {
+            val editButton = TextView(activity).apply {
+                text = "✎ Изменить"
+                textSize = 12f
+                setTextColor(Color.rgb(180, 110, 255))
+                gravity = Gravity.END
+                setPadding(0, 12, 0, 0)
+                isClickable = true
+                isFocusable = true
+                contentDescription = "Редактировать комментарий"
+                setOnClickListener {
+                    showEditCommentDialog(
+                        commentId = commentId,
+                        currentText = commentText
+                    )
+                }
+            }
+
+            card.addView(editButton)
+        }
+
         return card // Возвращает готовую карточку для добавления в контейнер.
+    }
+
+    // Открывает окно редактирования комментария.
+    private fun showEditCommentDialog(
+        commentId: String,
+        currentText: String
+    ) {
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            Toast.makeText(activity, "Войди в аккаунт", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val editInput = EditText(activity).apply {
+            setText(currentText)
+            setSelection(text.length)
+            minLines = 3
+            maxLines = 8
+            setPadding(24, 16, 24, 16)
+            hint = "Текст комментария"
+        }
+
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("Редактировать комментарий")
+            .setView(editInput)
+            .setNegativeButton("Отмена", null)
+            .setPositiveButton("Сохранить", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+
+            saveButton.setOnClickListener {
+                val updatedText = editInput.text.toString().trim()
+
+                if (updatedText.isBlank()) {
+                    editInput.error = "Комментарий не может быть пустым"
+                    return@setOnClickListener
+                }
+
+                if (updatedText.length > 1000) {
+                    editInput.error = "Максимум 1000 символов"
+                    return@setOnClickListener
+                }
+
+                saveButton.isEnabled = false
+
+                activity.lifecycleScope.launch {
+                    try {
+                        // Повторно проверяем владельца по данным Firestore.
+                        val commentRef = db.collection("posts")
+                            .document(postId)
+                            .collection("comments")
+                            .document(commentId)
+
+                        val commentDocument = commentRef.get().await()
+                        val actualAuthorId = commentDocument.getString("authorId")
+
+                        if (!commentDocument.exists() || actualAuthorId != currentUser.uid) {
+                            Toast.makeText(
+                                activity,
+                                "Можно редактировать только свой комментарий",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            dialog.dismiss()
+                            return@launch
+                        }
+
+                        commentRef.update(
+                            mapOf(
+                                "text" to updatedText,
+                                "isEdited" to true,
+                                "editedAt" to FieldValue.serverTimestamp()
+                            )
+                        ).await()
+
+                        Toast.makeText(
+                            activity,
+                            "Комментарий обновлён",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        dialog.dismiss()
+
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "CommentsManager",
+                            "Ошибка редактирования комментария",
+                            e
+                        )
+
+                        Toast.makeText(
+                            activity,
+                            "Не удалось изменить комментарий. Проверь права доступа.",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                    } finally {
+                        if (dialog.isShowing) {
+                            saveButton.isEnabled = true
+                        }
+                    }
+                }
+            }
+        }
+
+        dialog.show()
     }
 
     // Отключает слушатель комментариев, когда экран больше не нуждается в обновлениях.
